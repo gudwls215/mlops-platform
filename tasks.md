@@ -35,7 +35,7 @@
   - [x] Python 3.10+ 환경 설정
   - [x] FastAPI 프로젝트 생성
   - [x] requirements.txt 작성 (FastAPI, SQLAlchemy, psycopg2 등)
-  - [ ] 기본 디렉토리 구조 생성
+  - [x] 기본 디렉토리 구조 생성
   - [ ] Docker Compose 설정 파일 작성
   - [ ] 환경 변수 설정 (.env)
     - [ ] 데이터베이스 연결 정보 설정 (Host: 114.202.2.226:5433, DB: postgres, Schema: mlops)
