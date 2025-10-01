@@ -17,6 +17,7 @@
 3. 작업 완료 시 체크박스에 표시하도록 명령한다.
 4. 하나의 테스크가 끝나기전까지는 허락 없이 진행한다.
 5. 불필요한 이모티콘은 포함하지 않는다.
+6. 테스트파일은 완료후 삭제한다.
 
 ## 🎯 Phase 1: MVP (최소 기능 제품) - 2개월
 
@@ -31,30 +32,30 @@
   ✅ 데이터베이스 생성 및 사용자 설정 (DB: postgres, Schema: mlops)
   ✅ 기본 연결 테스트 -->
 
-- [ ] 백엔드 프로젝트 초기화 🔴
+- [x] 백엔드 프로젝트 초기화 ✅
   - [x] Python 3.10+ 환경 설정
   - [x] FastAPI 프로젝트 생성
   - [x] requirements.txt 작성 (FastAPI, SQLAlchemy, psycopg2 등)
   - [x] 기본 디렉토리 구조 생성
-  - [ ] Docker Compose 설정 파일 작성
-  - [ ] 환경 변수 설정 (.env)
-    - [ ] 데이터베이스 연결 정보 설정 (Host: 114.202.2.226:5433, DB: postgres, Schema: mlops)
+  - [x] Docker Compose 설정 파일 작성
+  - [x] 환경 변수 설정 (.env)
+    - [x] 데이터베이스 연결 정보 설정 (Host: 114.202.2.226:5433, DB: postgres, Schema: mlops)
 
-- [ ] 프론트엔드 프로젝트 초기화
-  - [ ] Node.js 및 npm 설치
-  - [ ] React 18+ 프로젝트 생성
-  - [ ] 필요 패키지 설치 (Material-UI or Tailwind CSS)
-  - [ ] 기본 컴포넌트 구조 설계
-  - [ ] 개발 서버 실행 테스트
+- [x] 프론트엔드 프로젝트 초기화 ✅
+  - [x] Node.js 및 npm 설치
+  - [x] React 18+ 프로젝트 생성
+  - [x] 필요 패키지 설치 (Material-UI)
+  - [x] 기본 컴포넌트 구조 설계
+  - [x] 개발 서버 실행 테스트
 
-- [ ] PostgreSQL 테이블 스키마 설계 및 생성 🔴
-  - [ ] 기존 DB 연결 확인 (114.202.2.226:5433, mlops 스키마)
-  - [ ] mlops.resumes 테이블 생성
-  - [ ] mlops.cover_letters 테이블 생성
-  - [ ] mlops.job_postings 테이블 생성
-  - [ ] mlops.prediction_logs 테이블 생성
-  - [ ] SQLAlchemy 모델 작성 (스키마 경로 포함)
-  - [ ] Alembic 마이그레이션 설정 (기존 DB 연동)
+- [x] PostgreSQL 테이블 스키마 설계 및 생성 ✅
+  - [x] 기존 DB 연결 확인 (114.202.2.226:5433, mlops 스키마)
+  - [x] mlops.resumes 테이블 생성
+  - [x] mlops.cover_letters 테이블 생성
+  - [x] mlops.ㄴjob_postings 테이블 생성
+  - [x] mlops.prediction_logs 테이블 생성
+  - [x] SQLAlchemy 모델 작성 (스키마 경로 포함)
+  - [x] Alembic 마이그레이션 설정 (기존 DB 연동)
 
 ### Week 3-4: 데이터 수집 시스템
 - [ ] 크롤링 인프라 구축
