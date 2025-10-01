@@ -58,12 +58,12 @@
   - [x] Alembic 마이그레이션 설정 (기존 DB 연동)
 
 ### Week 3-4: 데이터 수집 시스템
-- [ ] 크롤링 인프라 구축
-  - [ ] Scrapy 또는 BeautifulSoup 설치
-  - [ ] 기본 크롤러 클래스 설계
-  - [ ] robots.txt 준수 로직 구현
-  - [ ] Rate limiting 구현
-  - [ ] 에러 핸들링 및 재시도 로직
+- [x] 크롤링 인프라 구축
+  - [x] Scrapy 또는 BeautifulSoup 설치
+  - [x] 기본 크롤러 클래스 설계
+  - [x] robots.txt 준수 로직 구현
+  - [x] Rate limiting 구현
+  - [x] 에러 핸들링 및 재시도 로직
 
 - [ ] 사람인 크롤러 개발
   - [ ] 채용공고 목록 크롤링

@@ -1,0 +1,11 @@
+scrapy==2.11.2
+beautifulsoup4==4.14.2
+requests==2.32.4
+lxml==6.0.2
+selenium==4.27.1
+aiohttp==3.10.11
+asyncio==4.0.0
+python-decouple==3.8
+schedule==1.2.2
+psycopg2-binary==2.9.9
+pandas==2.0.3
