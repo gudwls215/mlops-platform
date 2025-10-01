@@ -1,13 +1,140 @@
-# 장년층 이력서 생성 도우미 - MLOps Platform
+# MLOps Platform
+
+50대 이상 시니어를 위한 AI 기반 이력서 생성 및 취업 매칭 플랫폼입니다.
 
 ## 📋 프로젝트 개요
-50대 이상 장년층을 위한 AI 기반 이력서 생성 및 채용 매칭 플랫폼입니다.
 
 ### 주요 기능
 - 🎤 음성 기반 이력서 입력 (Whisper STT)
 - 🤖 AI 기반 이력서 자동 생성 (GPT-4)
 - 📊 이력서-채용공고 매칭 및 합격률 예측
 - 📈 MLOps 파이프라인을 통한 지속적인 모델 개선
+
+## 프로젝트 구조
+
+```
+mlops-platform/
+├── backend/                 # FastAPI 백엔드
+│   ├── app/
+│   │   ├── main.py         # 메인 애플리케이션
+│   │   ├── core/           # 핵심 설정
+│   │   ├── models/         # 데이터베이스 모델
+│   │   ├── schemas/        # API 스키마
+│   │   ├── crud/           # CRUD 작업
+│   │   ├── api/            # API 라우터
+│   │   └── utils/          # 유틸리티
+│   ├── requirements.txt    # 의존성
+│   └── Dockerfile         # Docker 설정
+├── frontend/               # React 프론트엔드
+├── ml/                     # ML 모델 및 파이프라인
+├── airflow/               # Airflow DAG
+├── monitoring/            # 모니터링 설정
+├── docker/                # Docker 관련 파일
+└── docs/                  # 문서
+```
+
+## 시작하기
+
+### 환경 설정
+
+1. 환경 변수 설정:
+```bash
+cp .env.example .env
+# .env 파일을 편집하여 실제 값으로 수정
+```
+
+2. Docker 관리 스크립트 실행 권한 부여:
+```bash
+chmod +x docker-manage.sh
+```
+
+### 개발 환경 실행
+
+```bash
+# 개발 환경 시작
+./docker-manage.sh dev
+
+# 또는 직접 실행
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### 프로덕션 환경 실행
+
+```bash
+# 프로덕션 환경 시작
+./docker-manage.sh prod
+
+# 또는 직접 실행
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+## 서비스 접근
+
+### 개발 환경
+- **API 서버**: http://localhost:8000
+- **API 문서**: http://localhost:8000/docs
+- **MLflow**: http://localhost:5000
+
+### 프로덕션 환경
+- **웹 서비스**: http://localhost
+- **Grafana**: http://localhost:3000 (admin/admin123)
+- **Prometheus**: http://localhost:9090
+- **MLflow**: http://localhost:5000
+- **Airflow**: http://localhost:8080
+
+## Docker 명령어
+
+```bash
+# 개발 환경 시작
+./docker-manage.sh dev
+
+# 프로덕션 환경 시작
+./docker-manage.sh prod
+
+# 서비스 중지
+./docker-manage.sh stop
+
+# 상태 확인
+./docker-manage.sh status
+
+# 로그 확인
+./docker-manage.sh logs
+
+# 이미지 다시 빌드
+./docker-manage.sh build
+
+# 모든 것 제거 (주의!)
+./docker-manage.sh clean
+```
+
+## 데이터베이스
+
+- **호스트**: 114.202.2.226:5433
+- **데이터베이스**: mlops
+- **스키마**: mlops
+
+## API 엔드포인트
+
+### 인증
+- `POST /auth/login` - 로그인
+- `POST /auth/register` - 회원가입
+
+### 이력서
+- `GET /resumes/` - 이력서 목록
+- `POST /resumes/` - 이력서 생성
+- `GET /resumes/{id}` - 이력서 조회
+- `PUT /resumes/{id}` - 이력서 수정
+- `DELETE /resumes/{id}` - 이력서 삭제
+
+### 채용 공고
+- `GET /jobs/` - 채용 공고 목록
+- `POST /jobs/` - 채용 공고 생성
+- `GET /jobs/{id}` - 채용 공고 조회
+
+### 자기소개서
+- `GET /cover-letters/` - 자기소개서 목록
+- `POST /cover-letters/` - 자기소개서 생성
+- `GET /cover-letters/{id}` - 자기소개서 조회
 - 🔍 실시간 채용공고 크롤링 및 분석
 
 ## 🏗️ 아키텍처
