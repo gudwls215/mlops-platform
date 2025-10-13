@@ -14,7 +14,10 @@ from config import DATABASE_URL
 class DatabaseManager:
     """데이터베이스 관리 클래스"""
     
-    def __init__(self, database_url: str = DATABASE_URL):
+    def __init__(self, database_url: str = None):
+        # 올바른 패스워드로 DATABASE_URL 설정
+        if database_url is None:
+            database_url = 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/mlops'
         self.database_url = database_url
         self.connection = None
         
@@ -63,7 +66,7 @@ class DatabaseManager:
         try:
             # 중복 확인
             check_query = """
-                SELECT id FROM job_postings 
+                SELECT id FROM mlops.job_postings 
                 WHERE url = %s OR (title = %s AND company = %s)
                 LIMIT 1
             """
@@ -76,17 +79,15 @@ class DatabaseManager:
                 self.logger.info(f"이미 존재하는 채용공고: {job_data['title']} - {job_data['company']}")
                 return existing[0]['id']
             
-            # 새 데이터 삽입
+            # 새 데이터 삽입 (mlops 스키마에 맞춤)
             insert_query = """
-                INSERT INTO job_postings (
+                INSERT INTO mlops.job_postings (
                     title, company, location, salary, employment_type,
-                    experience_required, education_required, category,
-                    description, requirements, benefits, url, source,
-                    deadline, posted_at, tags, is_senior_friendly,
+                    experience, education, main_duties, qualifications, preferences,
+                    deadline, posted_date, url, source, is_senior_friendly,
                     created_at, updated_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING id
             """
             
@@ -113,15 +114,13 @@ class DatabaseManager:
                 job_data.get('employment_type', ''),
                 job_data.get('experience', ''),
                 job_data.get('education', ''),
-                job_data.get('category', ''),
-                job_data.get('description', ''),
-                job_data.get('requirements', ''),
-                job_data.get('benefits', ''),
-                job_data.get('url', ''),
-                job_data.get('site', ''),
+                job_data.get('main_duties', ''),
+                job_data.get('qualifications', ''),
+                job_data.get('preferences', ''),
                 deadline,
                 posted_at,
-                job_data.get('tags', []),
+                job_data.get('url', ''),
+                job_data.get('source', 'saramin'),
                 True,  # is_senior_friendly (이미 필터링됨)
                 datetime.now(),
                 datetime.now()
@@ -269,6 +268,171 @@ class DatabaseManager:
         except Exception as e:
             self.logger.error(f"CSV 내보내기 실패: {e}")
             return False
+    
+    def insert_cover_letter_sample(self, data: Dict) -> bool:
+        """자기소개서 샘플 데이터 삽입"""
+        insert_query = """
+        INSERT INTO mlops.cover_letter_samples (
+            title, company, position, department, experience_level,
+            content, is_passed, application_year, keywords,
+            url, views, likes, source
+        ) VALUES (
+            %(title)s, %(company)s, %(position)s, %(department)s, %(experience_level)s,
+            %(content)s, %(is_passed)s, %(application_year)s, %(keywords)s,
+            %(url)s, %(views)s, %(likes)s, %(source)s
+        )
+        ON CONFLICT (url) DO UPDATE SET
+            title = EXCLUDED.title,
+            content = EXCLUDED.content,
+            views = EXCLUDED.views,
+            likes = EXCLUDED.likes,
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING id;
+        """
+        
+        try:
+            # 기본값 설정
+            insert_data = {
+                'title': data.get('title', ''),
+                'company': data.get('company', ''),
+                'position': data.get('position'),
+                'department': data.get('department'),
+                'experience_level': data.get('experience_level'),
+                'content': data.get('content', ''),
+                'is_passed': data.get('is_passed'),
+                'application_year': data.get('application_year'),
+                'keywords': data.get('keywords', []),
+                'url': data.get('url'),
+                'views': data.get('views', 0),
+                'likes': data.get('likes', 0),
+                'source': data.get('source', 'linkareer')
+            }
+            
+            # INSERT 쿼리 실행 및 커밋
+            if not self.connection:
+                self.connect()
+            
+            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(insert_query, insert_data)
+                result = cursor.fetchall()
+                self.connection.commit()
+            
+            if result:
+                cover_letter_id = result[0]['id']
+                self.logger.info(f"자기소개서 저장 성공 - ID: {cover_letter_id}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"자기소개서 저장 실패: {e}")
+            return False
+    
+    def bulk_insert_cover_letter_samples(self, cover_letters: List[Dict]) -> int:
+        """자기소개서 샘플 벌크 삽입"""
+        if not cover_letters:
+            return 0
+            
+        successful_inserts = 0
+        
+        for cover_letter_data in cover_letters:
+            if self.insert_cover_letter_sample(cover_letter_data):
+                successful_inserts += 1
+        
+        self.logger.info(f"자기소개서 벌크 삽입 완료: {successful_inserts}/{len(cover_letters)}")
+        return successful_inserts
+    
+    def get_cover_letter_samples_stats(self) -> Dict:
+        """자기소개서 샘플 통계 조회"""
+        stats_query = """
+        SELECT 
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as recent,
+            COUNT(*) FILTER (WHERE is_passed = true) as passed,
+            COUNT(*) FILTER (WHERE is_passed = false) as failed,
+            COUNT(*) FILTER (WHERE application_year >= EXTRACT(YEAR FROM CURRENT_DATE) - 2) as recent_years
+        FROM mlops.cover_letter_samples;
+        """
+        
+        company_stats_query = """
+        SELECT company, COUNT(*) as count
+        FROM mlops.cover_letter_samples
+        WHERE company IS NOT NULL AND company != ''
+        GROUP BY company
+        ORDER BY count DESC
+        LIMIT 10;
+        """
+        
+        position_stats_query = """
+        SELECT position, COUNT(*) as count
+        FROM mlops.cover_letter_samples
+        WHERE position IS NOT NULL AND position != ''
+        GROUP BY position
+        ORDER BY count DESC
+        LIMIT 10;
+        """
+        
+        try:
+            # 전체 통계
+            stats_result = self.execute_query(stats_query, fetch=True)
+            stats = stats_result[0] if stats_result else {}
+            
+            # 회사별 통계
+            company_result = self.execute_query(company_stats_query, fetch=True)
+            stats['by_company'] = list(company_result) if company_result else []
+            
+            # 직무별 통계
+            position_result = self.execute_query(position_stats_query, fetch=True)
+            stats['by_position'] = list(position_result) if position_result else []
+            
+            return stats
+            
+        except Exception as e:
+            self.logger.error(f"자기소개서 통계 조회 실패: {e}")
+            return {}
+    
+    def search_cover_letters(self, company: str = None, position: str = None, 
+                           passed_only: bool = False, limit: int = 10) -> List[Dict]:
+        """자기소개서 검색"""
+        conditions = []
+        params = {}
+        
+        if company:
+            conditions.append("company ILIKE %(company)s")
+            params['company'] = f"%{company}%"
+        
+        if position:
+            conditions.append("position ILIKE %(position)s")
+            params['position'] = f"%{position}%"
+        
+        if passed_only:
+            conditions.append("is_passed = true")
+        
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+        
+        search_query = f"""
+        SELECT 
+            id, title, company, position, department, experience_level,
+            CASE 
+                WHEN LENGTH(content) > 200 
+                THEN LEFT(content, 200) || '...'
+                ELSE content
+            END as content_preview,
+            is_passed, application_year, views, likes, url, created_at
+        FROM mlops.cover_letter_samples
+        {where_clause}
+        ORDER BY views DESC, likes DESC, created_at DESC
+        LIMIT %(limit)s;
+        """
+        
+        params['limit'] = limit
+        
+        try:
+            result = self.execute_query(search_query, params, fetch=True)
+            return list(result) if result else []
+        except Exception as e:
+            self.logger.error(f"자기소개서 검색 실패: {e}")
+            return []
 
 
 class CrawlerScheduler:

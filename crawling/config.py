@@ -2,10 +2,9 @@
 크롤링 설정 파일
 """
 import os
-from decouple import config
 
 # 데이터베이스 설정
-DATABASE_URL = config('DATABASE_URL', default='postgresql://postgres:mlops2024!@114.202.2.226:5433/mlops')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/mlops')
 
 # 크롤링 설정
 USER_AGENTS = [

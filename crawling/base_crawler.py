@@ -278,6 +278,9 @@ class JobCrawlerUtils:
             job_data.get('company', ''),
             job_data.get('description', ''),
             job_data.get('requirements', ''),
+            job_data.get('qualifications', ''),
+            job_data.get('preferences', ''),
+            job_data.get('main_duties', ''),
             job_data.get('category', ''),
         ]).lower()
         

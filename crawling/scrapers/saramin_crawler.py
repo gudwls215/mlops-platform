@@ -36,8 +36,8 @@ class SaraminCrawler(RequestsCrawler):
                     
                     soup = BeautifulSoup(html, 'html.parser')
                     
-                    # 채용공고 링크 추출
-                    job_links = soup.find_all('a', class_='str_tit')
+                    # 채용공고 링크 추출 (실제 사람인 페이지 구조에 맞게 수정)
+                    job_links = soup.select('.item_recruit a[href*="/zf_user/jobs/relay/view"]')
                     
                     if not job_links:
                         self.logger.warning(f"채용공고 링크를 찾을 수 없음: {search_url}")
@@ -63,18 +63,18 @@ class SaraminCrawler(RequestsCrawler):
         self.logger.info(f"총 {len(job_urls)}개 채용공고 URL 수집 완료")
         return job_urls
     
-    def parse_job_listing(self, html: str) -> Optional[Dict]:
+    def parse_job_listing(self, html: str, url: str = '') -> Optional[Dict]:
         """개별 채용공고 파싱"""
         if not html:
             return None
-        
+
         try:
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             # 기본 정보 추출
             job_data = {
                 'site': 'saramin',
-                'url': '',
+                'url': url,
                 'title': '',
                 'company': '',
                 'location': '',
@@ -88,18 +88,26 @@ class SaraminCrawler(RequestsCrawler):
                 'benefits': '',
                 'deadline': '',
                 'posted_date': '',
-                'tags': []
-            }
+                'tags': [],
+                'main_duties': '',
+                'qualifications': '',
+                'preferences': ''
+            }            # 제목 (페이지 title 태그에서 추출)
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text()
+                # "회사명] 채용공고제목 - 사람인" 형태에서 제목 부분 추출
+                if '] ' in title_text and ' - 사람인' in title_text:
+                    title_part = title_text.split('] ', 1)[1].split(' - 사람인')[0]
+                    job_data['title'] = JobCrawlerUtils.clean_text(title_part)
             
-            # 제목
-            title_elem = soup.find('h1', class_='tit_job') or soup.find('div', class_='tit_job')
-            if title_elem:
-                job_data['title'] = JobCrawlerUtils.clean_text(title_elem.get_text())
-            
-            # 회사명
-            company_elem = soup.find('a', class_='link_tit') or soup.find('div', class_='recruit_info_company')
-            if company_elem:
-                job_data['company'] = JobCrawlerUtils.clean_text(company_elem.get_text())
+            # 회사명 (페이지 title 태그에서 추출)
+            if title_tag:
+                title_text = title_tag.get_text()
+                # "[회사명] 채용공고제목 - 사람인" 형태에서 회사명 부분 추출
+                if title_text.startswith('[') and '] ' in title_text:
+                    company_part = title_text.split('[')[1].split(']')[0]
+                    job_data['company'] = JobCrawlerUtils.clean_text(company_part)
             
             # 근무지역
             location_elem = soup.find('div', class_='recruit_condition')
@@ -160,22 +168,78 @@ class SaraminCrawler(RequestsCrawler):
                 # 직무 카테고리 추출 로직
                 job_data['category'] = JobCrawlerUtils.clean_text(category_text[:50])
             
-            # 상세 설명
-            desc_elem = soup.find('div', class_='user_content') or soup.find('div', class_='recruit_contents')
-            if desc_elem:
-                job_data['description'] = JobCrawlerUtils.clean_text(desc_elem.get_text())
+            # dt, dd 쌍에서 상세 정보 추출
+            dt_elements = soup.find_all('dt')
+            for dt in dt_elements:
+                dt_text = dt.get_text().strip()
+                dd = dt.find_next_sibling('dd')
+                if dd:
+                    dd_text = JobCrawlerUtils.clean_text(dd.get_text())
+                    
+                    # 각 필드별로 매핑
+                    if '경력' in dt_text:
+                        job_data['experience'] = dd_text
+                    elif '학력' in dt_text:
+                        job_data['education'] = dd_text
+                    elif '근무형태' in dt_text or '고용형태' in dt_text:
+                        job_data['employment_type'] = dd_text
+                    elif '급여' in dt_text or '연봉' in dt_text:
+                        job_data['salary'] = dd_text
+                    elif '근무지역' in dt_text or '근무지' in dt_text:
+                        job_data['location'] = dd_text
+                    elif '마감일' in dt_text:
+                        job_data['deadline'] = dd_text
+                    elif '시작일' in dt_text or '등록일' in dt_text:
+                        job_data['posted_date'] = dd_text
+                    elif '자격요건' in dt_text:
+                        job_data['qualifications'] = dd_text
+                    elif '우대사항' in dt_text:
+                        job_data['preferences'] = dd_text
+
+            # 주요업무, 자격요건, 우대사항 텍스트에서 추가 추출
+            page_text = soup.get_text()
             
-            # 지원 자격 요건
-            req_section = soup.find('div', class_='recruit_condition_list')
-            if req_section:
-                job_data['requirements'] = JobCrawlerUtils.clean_text(req_section.get_text())
-            
-            # 복리후생
-            benefit_elem = soup.find('div', class_='benefit_list')
-            if benefit_elem:
-                job_data['benefits'] = JobCrawlerUtils.clean_text(benefit_elem.get_text())
-            
-            # 마감일
+            # 주요업무 추출
+            if '주요업무' in page_text:
+                main_duties_elements = soup.find_all(string=re.compile('주요업무'))
+                for element in main_duties_elements:
+                    parent = element.parent
+                    if parent:
+                        siblings = parent.find_next_siblings()
+                        for sibling in siblings[:2]:
+                            sibling_text = JobCrawlerUtils.clean_text(sibling.get_text())
+                            if sibling_text and len(sibling_text) > 10:
+                                job_data['main_duties'] = sibling_text
+                                break
+
+            # 근무조건에서 추가 정보 추출
+            if '근무조건' in page_text:
+                condition_match = re.search(r'근무조건.*?(?=\n|$)', page_text, re.DOTALL)
+                if condition_match:
+                    condition_text = condition_match.group(0)
+                    # 고용형태 추출
+                    if '정규직' in condition_text:
+                        job_data['employment_type'] = '정규직'
+                    elif '계약직' in condition_text:
+                        job_data['employment_type'] = '계약직'
+                    
+                    # 급여 정보 추출
+                    salary_match = re.search(r'급여[:\s]*([^•\n]+)', condition_text)
+                    if salary_match:
+                        job_data['salary'] = JobCrawlerUtils.clean_text(salary_match.group(1))
+                    
+                    # 근무지 추출
+                    location_match = re.search(r'근무지[:\s]*([^•\n]+)', condition_text)
+                    if location_match:
+                        job_data['location'] = JobCrawlerUtils.clean_text(location_match.group(1))
+
+            # 전체 설명은 페이지 텍스트에서 채용공고 관련 부분만 추출
+            if not job_data['description']:
+                # 제목 이후 텍스트를 설명으로 사용
+                if job_data['title'] in page_text:
+                    title_idx = page_text.find(job_data['title'])
+                    desc_text = page_text[title_idx + len(job_data['title']):title_idx + 500]
+                    job_data['description'] = JobCrawlerUtils.clean_text(desc_text)            # 마감일
             deadline_elem = soup.find('div', class_='recruit_date')
             if deadline_elem:
                 deadline_text = deadline_elem.get_text()
@@ -196,9 +260,12 @@ class SaraminCrawler(RequestsCrawler):
             job_data['tags'] = [JobCrawlerUtils.clean_text(tag.get_text()) for tag in tag_elems]
             
             # 시니어 친화적인지 확인
-            if not JobCrawlerUtils.is_senior_friendly(job_data):
-                self.logger.debug(f"시니어 친화적이지 않은 공고: {job_data['title']}")
+            is_senior_friendly = JobCrawlerUtils.is_senior_friendly(job_data)
+            if not is_senior_friendly:
+                self.logger.warning(f"시니어 친화적이지 않은 공고: {job_data['title']} - {job_data['company']}")
                 return None
+            else:
+                self.logger.info(f"시니어 친화적 공고 발견: {job_data['title']} - {job_data['company']}")
             
             self.logger.info(f"채용공고 파싱 완료: {job_data['title']} - {job_data['company']}")
             return job_data
@@ -227,13 +294,22 @@ class SaraminCrawler(RequestsCrawler):
             try:
                 self.logger.info(f"채용공고 크롤링 중 ({i}/{len(job_urls)}): {url}")
                 
-                html = self.fetch_page(url)
+                # 실제 채용공고 상세 페이지 URL로 변경
+                detail_url = url.replace('/zf_user/jobs/relay/view', '/zf_user/jobs/view')
+                detail_url = re.sub(r'&[^=]+=([^&]*)', '', detail_url)  # 불필요한 파라미터 제거
+                if '?' not in detail_url:
+                    detail_url += '?'
+                if 'rec_idx=' not in detail_url:
+                    rec_idx_match = re.search(r'rec_idx=(\d+)', url)
+                    if rec_idx_match:
+                        detail_url = f"https://www.saramin.co.kr/zf_user/jobs/view?rec_idx={rec_idx_match.group(1)}"
+                
+                html = self.fetch_page(detail_url)
                 if not html:
                     continue
                 
-                job_data = self.parse_job_listing(html)
+                job_data = self.parse_job_listing(html, url)
                 if job_data:
-                    job_data['url'] = url
                     crawled_jobs.append(job_data)
                     self.logger.info(f"채용공고 크롤링 성공: {job_data['title']}")
                 
