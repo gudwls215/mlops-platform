@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL 데이터베이스 (개발용)
-  postgres:
-    image: postgres:15
-    container_name: mlops-postgres-dev
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - mlops-dev-network
-
   # Redis (개발용)
   redis:
     image: redis:7-alpine
@@ -35,12 +19,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
-      - DATABASE_SCHEMA=mlops
+      - DATABASE_HOST=114.202.2.226
+      - DATABASE_PORT=5433
+      - DATABASE_NAME=mlops
+      - DATABASE_SCHEMA=mlops 
       - DATABASE_USER=postgres
-      - DATABASE_PASSWORD=postgres
+      - DATABASE_PASSWORD=xlxldpa!@#
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DEBUG=true

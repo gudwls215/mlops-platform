@@ -58,6 +58,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+airflow_*.log
+
+# Temporary files
+temp/
+*.tmp
+*.bak
 
 # ML Models
 *.pkl

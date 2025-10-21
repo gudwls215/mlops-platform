@@ -28,8 +28,22 @@ mlops-platform/
 ├── frontend/               # React 프론트엔드
 ├── ml/                     # ML 모델 및 파이프라인
 ├── airflow/               # Airflow DAG
+│   └── dags/              # DAG 정의 파일
+├── crawling/              # 데이터 수집 크롤러
+│   ├── scrapers/          # 크롤러 구현체
+│   └── database.py        # DB 매니저
 ├── monitoring/            # 모니터링 설정
 ├── docker/                # Docker 관련 파일
+├── scripts/               # 유틸리티 스크립트
+│   ├── test.py            # DB 테스트
+│   ├── test_saramin_only.py  # Saramin 크롤러 테스트
+│   └── init_remote_db.py  # DB 초기화
+├── notebooks/             # Jupyter 노트북
+│   ├── airflow_multi_project_management.ipynb
+│   ├── data_processing_debug.ipynb
+│   └── openai_api_integration.ipynb
+├── logs/                  # 로그 파일
+├── temp/                  # 임시 파일
 └── docs/                  # 문서
 ```
 

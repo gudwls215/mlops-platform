@@ -21,16 +21,16 @@
 
 ## 🎯 Phase 1: MVP (최소 기능 제품) - 2개월
 
-### Week 1-2: 프로젝트 초기화 (인프라 기 완료)
-<!-- ✅ 서버 환경 설정 (완료)
-  ✅ Ubuntu 서버 설치 및 기본 설정
-  ✅ Docker 및 Docker Compose 설치  
-  ✅ Nginx 설치 및 기본 설정
+### Week 1-2: 프로젝트 초기화 ✅ (완료)
+- [x] 서버 환경 설정
+  - [x] Ubuntu 서버 설치 및 기본 설정
+  - [x] Docker 및 Docker Compose 설치  
+  - [x] Nginx 설치 및 기본 설정
   
-✅ 데이터베이스 설정 (완료)
-  ✅ PostgreSQL 서버 실행 (Host: 114.202.2.226:5433)
-  ✅ 데이터베이스 생성 및 사용자 설정 (DB: postgres, Schema: mlops)
-  ✅ 기본 연결 테스트 -->
+- [x] 데이터베이스 설정
+  - [x] PostgreSQL 서버 실행 (Host: 114.202.2.226:5433)
+  - [x] 데이터베이스 생성 및 사용자 설정 (DB: postgres, Schema: mlops)
+  - [x] 기본 연결 테스트
 
 - [x] 백엔드 프로젝트 초기화
   - [x] Python 3.10+ 환경 설정
@@ -57,7 +57,7 @@
   - [x] SQLAlchemy 모델 작성 (스키마 경로 포함)
   - [x] Alembic 마이그레이션 설정 (기존 DB 연동)
 
-### Week 3-4: 데이터 수집 시스템
+### Week 3-4: 데이터 수집 시스템 ✅ (완료)
 - [x] 크롤링 인프라 구축
   - [x] Scrapy 또는 BeautifulSoup 설치
   - [x] 기본 크롤러 클래스 설계
@@ -77,11 +77,11 @@
   - [x] 회사명, 직무별 분류
   - [x] 합격/불합격 정보 추출 (가능한 경우)
 
-- [ ] 데이터 처리 및 저장
+- [x] 데이터 처리 및 저장
   - [x] HTML 태그 제거 및 텍스트 정제
   - [x] 중복 데이터 제거 로직
-  - [ ] PostgreSQL 저장 로직 (mlops 스키마 대상)
-  - [ ] 데이터 검증 및 품질 체크
+  - [x] PostgreSQL 저장 로직 (mlops 스키마 대상)
+  - [x] 데이터 검증 및 품질 체크
 
 - [ ] Airflow 기본 설정
   - [ ] Apache Airflow 설치

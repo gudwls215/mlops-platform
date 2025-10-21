@@ -6,291 +6,188 @@ Linkareer 자기소개서 크롤러
 장년층을 위한 자기소개서 샘플 데이터 수집
 """
 
-import requests
-from bs4 import BeautifulSoup
-import time
+import asyncio
 import random
-from urllib.parse import urljoin, parse_qs, urlparse
-import json
 import re
 from datetime import datetime
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
 from database import DatabaseManager
 
 class LinkareerCoverLetterCrawler:
     def __init__(self):
         self.base_url = "https://linkareer.com"
-        self.cover_letter_url = "https://linkareer.com/cover-letter"
-        
-        # 세션 설정
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-        })
-        
-        # 시니어 친화적 키워드
-        self.senior_keywords = [
-            '경력', '시니어', '책임', '매니저', '부장', '과장', '팀장', 
-            '리더', '관리', '운영', '기획', '전략', '컨설팅', '멘토링',
-            '10년', '15년', '20년', '25년', '30년', '경험', '전문',
-            '노하우', '전문성', '숙련', '베테랑', '실무진', '핵심인재'
-        ]
+        self.cover_letter_url = "https://linkareer.com/cover-letter/search"
         
         # 데이터베이스 매니저
         self.db_manager = DatabaseManager()
         
-    def get_cover_letter_list(self, page=1, max_pages=5):
-        """자기소개서 목록 페이지 크롤링"""
-        cover_letters = []
         
-        for current_page in range(1, max_pages + 1):
-            print(f"📄 자기소개서 목록 페이지 {current_page} 크롤링 중...")
-            
-            try:
-                # 페이지 요청
-                params = {'page': current_page}
-                response = self.session.get(self.cover_letter_url, params=params, timeout=10)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # 자기소개서 아이템 찾기
-                cover_letter_items = soup.find_all('div', class_='cover-letter-item') or \
-                                   soup.find_all('article', class_='cover-letter') or \
-                                   soup.find_all('div', class_='item') or \
-                                   soup.select('.list-item, .card-item, .cover-letter-card')
-                
-                if not cover_letter_items:
-                    # 다른 셀렉터 시도
-                    cover_letter_items = soup.select('a[href*="cover-letter"]')
-                
-                print(f"  찾은 자기소개서 아이템: {len(cover_letter_items)}개")
-                
-                if not cover_letter_items:
-                    print(f"  페이지 {current_page}에서 자기소개서를 찾을 수 없습니다.")
-                    # HTML 구조 분석을 위한 샘플 출력
-                    print("  페이지 HTML 샘플:")
-                    print(response.text[:1000])
-                    break
-                
-                # 각 아이템 처리
-                for item in cover_letter_items:
-                    try:
-                        cover_letter_data = self.extract_cover_letter_preview(item)
-                        if cover_letter_data and self.is_senior_friendly(cover_letter_data):
-                            cover_letters.append(cover_letter_data)
-                            print(f"  ✅ 시니어 친화적 자기소개서 발견: {cover_letter_data.get('title', 'N/A')[:50]}...")
-                        
-                        time.sleep(random.uniform(0.5, 1.0))
-                        
-                    except Exception as e:
-                        print(f"  ❌ 아이템 처리 오류: {e}")
-                        continue
-                
-                # 페이지 간 딜레이
-                time.sleep(random.uniform(2, 4))
-                
-            except Exception as e:
-                print(f"❌ 페이지 {current_page} 크롤링 오류: {e}")
-                continue
+
+    # --- 2단계: 상세 페이지에서 정보를 추출하는 함수  ---
+    async def scrape_detail_page(self, page, url):
+        """
+        개별 자소서 URL에 접속하여 상세 정보를 추출하는 함수
         
-        print(f"📊 총 {len(cover_letters)}개의 시니어 친화적 자기소개서 발견")
-        return cover_letters
-    
-    def extract_cover_letter_preview(self, item):
-        """자기소개서 미리보기 정보 추출"""
-        data = {}
+        이 함수가 하는 일:
+        1. 주어진 URL(자소서 페이지)에 접속
+        2. HTML에서 회사명, 직무, 합격스펙, 자소서 내용을 찾아서 가져옴
+        3. 데이터를 깔끔하게 정리해서 반환
         
+        매개변수:
+            page: 웹 브라우저 페이지 객체
+            url: 방문할 자소서 페이지 주소
+        
+        반환값:
+            딕셔너리 형태의 자소서 정보 (회사, 직무, 스펙, 자소서 내용 등)
+        """
+        print(f"  > 상세 페이지 분석 중... {url}")
         try:
-            # URL 추출
-            link = item.find('a') or item
-            if link and link.get('href'):
-                data['url'] = urljoin(self.base_url, link.get('href'))
-            else:
-                return None
+            # 웹페이지 접속 (최대 20초 대기)
+            await page.goto(url, wait_until='domcontentloaded', timeout=20000)
             
-            # 제목 추출
-            title_selectors = [
-                '.title', '.subject', '.cover-letter-title', 'h3', 'h4', 
-                '.item-title', '.card-title', '[class*="title"]'
-            ]
+            # HTML에서 기본 정보 추출 (회사/직무/시기)
+            basic_info_text = await page.locator('h1.basic-info').first.inner_text()
+            parts = [p.strip() for p in basic_info_text.split('/')]  # '/'로 나누어서 정리
+            company = parts[0] if len(parts) > 0 else ''  # 회사명
+            role = parts[1] if len(parts) > 1 else ''     # 직무
+            period = parts[2] if len(parts) > 2 else ''   # 시기
+
+            # 합격스펙 정보 가져오기 (학점, 어학점수 등)
+            spec_info_text = await page.locator('h3.spec-info').first.inner_text()
             
-            for selector in title_selectors:
-                title_elem = item.select_one(selector)
-                if title_elem:
-                    data['title'] = title_elem.get_text().strip()
-                    break
+            # 자기소개서 본문 가져오기
+            cover_letter_content = await page.locator('main.dwBPHz').first.inner_text()
             
-            if not data.get('title'):
-                # 링크 텍스트를 제목으로 사용
-                if link and link.get_text():
-                    data['title'] = link.get_text().strip()
+            # 특수문자 제거 (컴퓨터가 읽기 어려운 문자들)
+            clean_cover_letter = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', cover_letter_content)
             
-            # 회사명 추출
-            company_selectors = [
-                '.company', '.company-name', '.corp', '[class*="company"]',
-                '.info .company', '.meta .company'
-            ]
+            # 데이터베이스 저장 형식에 맞게 변환
+            cover_letter_data = {
+                'title': f"{company} {role} ({period})",
+                'company': company,
+                'position': role,
+                'application_period': period,
+                'spec': spec_info_text,
+                'content': clean_cover_letter,
+                'url': url,
+                'application_year': self.extract_year_from_period(period)
+            }
             
-            for selector in company_selectors:
-                company_elem = item.select_one(selector)
-                if company_elem:
-                    data['company'] = company_elem.get_text().strip()
-                    break
-            
-            # 직무/부서 추출
-            position_selectors = [
-                '.position', '.job', '.dept', '.department', '[class*="position"]',
-                '.job-title', '.role'
-            ]
-            
-            for selector in position_selectors:
-                position_elem = item.select_one(selector)
-                if position_elem:
-                    data['position'] = position_elem.get_text().strip()
-                    break
-            
-            # 메타 정보 추출
-            meta_info = item.select('.meta, .info, .details')
-            for meta in meta_info:
-                text = meta.get_text()
-                
-                # 연도 추출
-                year_match = re.search(r'20\d{2}', text)
-                if year_match:
-                    data['application_year'] = int(year_match.group())
-                
-                # 조회수 추출
-                views_match = re.search(r'조회수?\s*(\d+)', text)
-                if views_match:
-                    data['views'] = int(views_match.group(1))
-                
-                # 좋아요 추출
-                likes_match = re.search(r'좋아요\s*(\d+)', text)
-                if likes_match:
-                    data['likes'] = int(likes_match.group(1))
-            
-            # 합격 여부 추출
-            pass_indicators = item.select('.pass, .success, [class*="pass"]')
-            if pass_indicators:
-                pass_text = ' '.join([elem.get_text() for elem in pass_indicators])
-                data['is_passed'] = '합격' in pass_text or '최종합격' in pass_text
-            
-            return data
+            return cover_letter_data
             
         except Exception as e:
-            print(f"  ❌ 미리보기 추출 오류: {e}")
+            # 오류가 발생하면 에러 메시지 출력하고 None 반환
+            print(f"  [오류] 상세 페이지 처리 실패: {url}, 원인: {e}")
             return None
     
-    def get_cover_letter_detail(self, url):
-        """자기소개서 상세 내용 크롤링"""
+    def extract_year_from_period(self, period):
+        """시기 문자열에서 연도 추출"""
         try:
-            print(f"📝 상세 자기소개서 크롤링: {url}")
+            year_match = re.search(r'20\d{2}', period)
+            if year_match:
+                return int(year_match.group())
+            return datetime.now().year
+        except:
+            return datetime.now().year
+
+    # --- 1단계: 링크 수집 함수 ---
+    async def get_all_data_and_save_to_excel(self, start_page, end_page):
+        """
+        링커리어에서 자소서 링크들을 수집하고 상세 정보를 가져오는 메인 함수
+        
+        이 함수가 하는 일:
+        1. 지정된 페이지 범위에서 자소서 링크들을 모음
+        2. 각 링크에 들어가서 상세 정보를 수집
+        3. 모든 데이터를 리스트로 정리해서 반환
+        
+        매개변수:
+            start_page: 시작할 페이지 번호 (예: 1)
+            end_page: 끝낼 페이지 번호 (예: 10)
+        
+        반환값:
+            모든 자소서 데이터가 담긴 리스트
+        """
+        all_links = []        # 수집한 모든 링크를 저장할 리스트
+        detailed_data = []    # 상세 정보를 저장할 리스트
+
+        # Playwright로 웹 브라우저 실행
+        async with async_playwright() as p:
+            # 크롬 브라우저를 headless 모드로 실행 (화면에 안 보이게)
+            browser = await p.chromium.launch(headless=True)
             
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # 자기소개서 본문 추출
-            content_selectors = [
-                '.content', '.cover-letter-content', '.letter-content',
-                '.main-content', '.body', '.description', '[class*="content"]'
-            ]
-            
-            content = ""
-            for selector in content_selectors:
-                content_elem = soup.select_one(selector)
-                if content_elem:
-                    # 불필요한 요소 제거
-                    for unwanted in content_elem.select('script, style, .ad, .advertisement'):
-                        unwanted.decompose()
+            # 사용자 에이전트 설정 (봇이 아닌 일반 브라우저처럼 보이게)
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            page = await context.new_page()
+
+            # 지정된 페이지 범위만큼 반복
+            for i in range(start_page, end_page + 1):
+                print(f"\n[INFO] {i}페이지 링크 수집 시작...")
+                try: 
+                    # 링커리어 자소서 검색 페이지로 이동
+                    target_url = f"https://linkareer.com/cover-letter/search?page={i}&tab=all"
+                    await page.goto(target_url, wait_until='networkidle', timeout=30000)
+                    await page.wait_for_timeout(1000) # 페이지 로드 후 1초 대기 (안정성을 위해)
+                    print(f"[SUCCESS] {i}페이지가 완전히 로드되었습니다.")
                     
-                    content = content_elem.get_text().strip()
-                    break
+                    # 페이지에서 모든 자소서 링크를 찾아서 가져옴
+                    found_links = await page.eval_on_selector_all(
+                        'a.link',  # CSS 선택자: class가 'link'인 모든 <a> 태그
+                        'elements => elements.map(el => el.getAttribute("href"))'  # href 속성값 추출
+                    )
+                    
+                    # 각 링크를 확인하고 중복되지 않으면 리스트에 추가
+                    for href in found_links:
+                        # 상대경로면 절대경로로 변환
+                        link = "https://linkareer.com" + href if href.startswith('/') else href
+                        # 자소서 링크이고 아직 없는 링크면 추가
+                        if '/cover-letter/' in link and link not in all_links:
+                            all_links.append(link)
+                
+                # 페이지 로딩 시간이 너무 오래 걸리면
+                except PlaywrightTimeoutError:
+                    print(f"[ERROR] {i}페이지 로딩 시간 초과. 다음 페이지로 넘어갑니다.")
+                    continue  # 이 페이지는 건너뛰고 다음 페이지로
+                
+                # 그 외 다른 오류가 발생하면
+                except Exception as e:
+                    print(f"[ERROR] {i}페이지 처리 중 오류 발생: {e}")
+                    print("마지막 페이지에 도달했거나 페이지 이동 중 문제가 발생하여 수집을 중단합니다.")
+                    break  # 반복문 종료
             
-            if not content:
-                # 전체 페이지에서 자기소개서 내용 추정
-                all_text = soup.get_text()
-                paragraphs = [p.strip() for p in all_text.split('\n') if len(p.strip()) > 50]
-                if len(paragraphs) > 3:
-                    content = '\n'.join(paragraphs[1:6])  # 상위 몇 개 단락 사용
+            print(f"\n--- [1단계 완료] 총 {len(all_links)}개의 고유 링크 수집 완료 ---")
             
-            # 추가 메타데이터 추출
-            meta_data = {}
+            print("\n--- [2단계 시작] 상세 정보 크롤링을 시작합니다. ---")
+            # 수집한 모든 링크에 대해 상세 정보 가져오기
+            saved_count = 0
+            for i, link in enumerate(all_links):
+                print(f"[{i+1}/{len(all_links)}] 처리 중: {link}")
+                data = await self.scrape_detail_page(page, link)
+                if data:  # 정상적으로 데이터를 가져왔으면
+                    detailed_data.append(data)
+                    # 바로 데이터베이스에 저장
+                    if self.save_cover_letter(data, data.get('content', '')):
+                        saved_count += 1
+                        print(f"    ✅ 저장 성공: {data.get('title', 'Unknown')[:50]}...")
+                    else:
+                        print(f"    ❌ 저장 실패: {data.get('title', 'Unknown')[:50]}...")
+                
+                # 딜레이 (서버 부하 방지) 
+                await page.wait_for_timeout(random.randint(2000, 4000))
             
-            # 제목 재추출 (더 정확한)
-            title_selectors = ['.title', 'h1', 'h2', '.main-title', '.cover-letter-title']
-            for selector in title_selectors:
-                title_elem = soup.select_one(selector)
-                if title_elem:
-                    meta_data['title'] = title_elem.get_text().strip()
-                    break
+            await browser.close()  # 브라우저 종료
             
-            # 키워드 추출
-            keywords = self.extract_keywords(content)
-            meta_data['keywords'] = keywords
+            print(f"\n🎉 크롤링 완료!")
+            print(f"📊 총 발견: {len(all_links)}개")
+            print(f"💾 저장 성공: {saved_count}개")
             
-            return content, meta_data
-            
-        except Exception as e:
-            print(f"❌ 상세 크롤링 오류: {e}")
-            return None, None
-    
-    def extract_keywords(self, content):
-        """자기소개서 내용에서 키워드 추출"""
-        keywords = []
-        
-        # 기본 키워드 리스트
-        keyword_patterns = [
-            # 기술 키워드
-            r'\b(Python|Java|JavaScript|React|SQL|AWS|Docker|Kubernetes|Git|Linux)\b',
-            # 업무 키워드  
-            r'\b(기획|운영|관리|개발|설계|분석|마케팅|영업|인사|재무|회계)\b',
-            # 경력 키워드
-            r'\b(\d+년|경력|경험|전문|숙련|베테랑|시니어)\b',
-            # 성과 키워드
-            r'\b(성과|달성|개선|효율|절약|증가|향상|최적화)\b'
-        ]
-        
-        for pattern in keyword_patterns:
-            matches = re.findall(pattern, content, re.IGNORECASE)
-            keywords.extend(matches)
-        
-        # 중복 제거 및 정리
-        keywords = list(set([kw.strip() for kw in keywords if len(kw.strip()) > 1]))
-        return keywords[:10]  # 상위 10개만
-    
-    def is_senior_friendly(self, cover_letter_data):
-        """시니어 친화적 자기소개서인지 판단"""
-        text_to_check = f"{cover_letter_data.get('title', '')} {cover_letter_data.get('company', '')} {cover_letter_data.get('position', '')}"
-        
-        # 시니어 키워드 확인
-        for keyword in self.senior_keywords:
-            if keyword in text_to_check:
-                return True
-        
-        # 연도 기준 (최근 5년 이내)
-        current_year = datetime.now().year
-        app_year = cover_letter_data.get('application_year')
-        if app_year and current_year - app_year <= 5:
-            return True
-        
-        # 조회수 기준 (인기 있는 자기소개서)
-        views = cover_letter_data.get('views', 0)
-        if views > 100:
-            return True
-        
-        return False
-    
+        return detailed_data
+
+
     def save_cover_letter(self, cover_letter_data, content):
         """자기소개서를 데이터베이스에 저장"""
         try:
@@ -301,11 +198,15 @@ class LinkareerCoverLetterCrawler:
                 'position': cover_letter_data.get('position'),
                 'department': cover_letter_data.get('department'),
                 'experience_level': cover_letter_data.get('experience_level'),
-                'content': content or '',
+                'content': content or cover_letter_data.get('content', ''),
                 'is_passed': cover_letter_data.get('is_passed'),
                 'application_year': cover_letter_data.get('application_year'),
+                'application_period': cover_letter_data.get('application_period'),
+                'company_type': cover_letter_data.get('company_type'),
+                'spec': cover_letter_data.get('spec'),
                 'keywords': cover_letter_data.get('keywords', []),
                 'url': cover_letter_data.get('url'),
+                'scrap_count': cover_letter_data.get('scrap_count', 0),
                 'views': cover_letter_data.get('views', 0),
                 'likes': cover_letter_data.get('likes', 0)
             }
@@ -324,57 +225,69 @@ class LinkareerCoverLetterCrawler:
             print(f"❌ 저장 오류: {e}")
             return False
     
-    def crawl_cover_letters(self, max_pages=3, max_details=20):
-        """전체 자기소개서 크롤링 프로세스"""
-        print("🚀 Linkareer 자기소개서 크롤링 시작")
+
+
+    async def crawl_cover_letters_playwright(self, max_pages=3):
+        """Playwright를 사용한 전체 자기소개서 크롤링 프로세스"""
+        print("🚀 Linkareer 자기소개서 크롤링 시작 (Playwright 방식)")
         print("="*60)
         
         try:
-            # 1. 목록 페이지 크롤링
-            cover_letter_list = self.get_cover_letter_list(max_pages=max_pages)
+            # get_all_data_and_save_to_excel을 사용하여 크롤링
+            detailed_data = await self.get_all_data_and_save_to_excel(1, max_pages)
             
-            if not cover_letter_list:
-                print("❌ 자기소개서 목록을 찾을 수 없습니다.")
-                return
+            print(f"\n🎉 Playwright 크롤링 완료!")
+            print(f"📊 총 수집: {len(detailed_data)}개")
             
-            # 2. 상세 페이지 크롤링 및 저장
-            saved_count = 0
-            
-            for i, cover_letter_data in enumerate(cover_letter_list[:max_details]):
-                print(f"\n📝 [{i+1}/{min(len(cover_letter_list), max_details)}] 상세 크롤링 중...")
-                
-                if not cover_letter_data.get('url'):
-                    print("  URL이 없어 스킵합니다.")
-                    continue
-                
-                # 상세 내용 크롤링
-                content, meta_data = self.get_cover_letter_detail(cover_letter_data['url'])
-                
-                if content:
-                    # 메타데이터 병합
-                    if meta_data:
-                        cover_letter_data.update(meta_data)
-                    
-                    # 데이터베이스에 저장
-                    if self.save_cover_letter(cover_letter_data, content):
-                        saved_count += 1
-                
-                # 딜레이 (서버 부하 방지)
-                time.sleep(random.uniform(2, 4))
-            
-            print(f"\n🎉 크롤링 완료!")
-            print(f"📊 총 발견: {len(cover_letter_list)}개")
-            print(f"💾 저장 성공: {saved_count}개")
+            return detailed_data
             
         except Exception as e:
-            print(f"❌ 크롤링 중 오류 발생: {e}")
+            print(f"❌ Playwright 크롤링 중 오류 발생: {e}")
+            print("⚠️ 네트워크 연결을 확인하고 다시 시도해주세요.")
+            return []
+
+    def crawl(self, max_items=50):
+        """DAG에서 호출하는 인터페이스 메서드"""
+        try:
+            print(f"🚀 Linkareer 크롤링 시작 (최대 {max_items}개, Playwright 방식)")
+            
+            # max_items를 기반으로 페이지 수 계산
+            max_pages = max(1, max_items // 10)  # 페이지당 약 10개 가정
+            
+            # asyncio를 사용하여 비동기 크롤링 실행
+            detailed_data = asyncio.run(self.crawl_cover_letters_playwright(max_pages=max_pages))
+            
+            # 결과 반환
+            return {
+                "status": "completed", 
+                "message": f"크롤링 완료 - {len(detailed_data)}개 수집",
+                "data_count": len(detailed_data)
+            }
+            
+        except Exception as e:
+            print(f"❌ 크롤링 오류: {e}")
+            return {"status": "failed", "message": str(e)}
 
 def main():
     """메인 실행 함수"""
-    crawler = LinkareerCoverLetterCrawler()
+    print("🚀 Linkareer 크롤러 시작")
+    print("="*50)
     
-    # 크롤링 실행 (테스트용으로 소량)
-    crawler.crawl_cover_letters(max_pages=2, max_details=5)
+    try:
+        crawler = LinkareerCoverLetterCrawler()
+        
+        # 크롤링 실행 (Playwright 방식)
+        print("\n📋 크롤링 시작...")
+        result = crawler.crawl(max_items=20)
+        print(f"결과: {result}")
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ 사용자에 의해 중단됨")
+    except Exception as e:
+        print(f"❌ 예상치 못한 오류: {e}")
+        print("⚠️ 크롤링을 재시도하거나 나중에 다시 시도해주세요.")
+    
+    print("\n🏁 크롤러 종료")
 
 if __name__ == "__main__":
     main()

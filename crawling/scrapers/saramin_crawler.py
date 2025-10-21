@@ -5,6 +5,14 @@ import re
 import urllib.parse
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
+import sys
+import os
+
+# 상위 디렉토리의 모듈들을 import할 수 있도록 경로 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 from base_crawler import RequestsCrawler, JobCrawlerUtils
 from config import TARGET_SITES, SENIOR_KEYWORDS
@@ -17,6 +25,10 @@ class SaraminCrawler(RequestsCrawler):
         site_config = TARGET_SITES['saramin']
         super().__init__('saramin', site_config['base_url'], site_config['robots_url'])
         self.job_search_url = site_config['job_search_url']
+        
+        # 데이터베이스 매니저 추가
+        from database import DatabaseManager
+        self.db_manager = DatabaseManager()
     
     def get_job_urls(self, category: str = None, page_limit: int = 5) -> List[str]:
         """채용공고 URL 목록 가져오기"""
@@ -73,7 +85,7 @@ class SaraminCrawler(RequestsCrawler):
 
             # 기본 정보 추출
             job_data = {
-                'site': 'saramin',
+                'source': 'saramin',  # site -> source로 변경
                 'url': url,
                 'title': '',
                 'company': '',
@@ -274,9 +286,9 @@ class SaraminCrawler(RequestsCrawler):
             self.logger.error(f"채용공고 파싱 중 오류: {e}")
             return None
     
-    def crawl_jobs(self, max_jobs: int = 100) -> List[Dict]:
+    def crawl_jobs(self, max_jobs: int = 100, save_to_db: bool = True) -> List[Dict]:
         """채용공고 크롤링 실행"""
-        self.logger.info(f"사람인 채용공고 크롤링 시작 (최대 {max_jobs}개)")
+        self.logger.info(f"사람인 채용공고 크롤링 시작 (최대 {max_jobs}개, DB 저장: {save_to_db})")
         
         # URL 목록 가져오기
         job_urls = self.get_job_urls()
@@ -289,6 +301,7 @@ class SaraminCrawler(RequestsCrawler):
         job_urls = job_urls[:max_jobs]
         
         crawled_jobs = []
+        saved_count = 0
         
         for i, url in enumerate(job_urls, 1):
             try:
@@ -311,13 +324,30 @@ class SaraminCrawler(RequestsCrawler):
                 job_data = self.parse_job_listing(html, url)
                 if job_data:
                     crawled_jobs.append(job_data)
-                    self.logger.info(f"채용공고 크롤링 성공: {job_data['title']}")
+                    
+                    # 실시간 DB 저장 (Linkareer 방식과 동일)
+                    if save_to_db:
+                        try:
+                            job_id = self.db_manager.insert_job_posting(job_data)
+                            if job_id:
+                                saved_count += 1
+                                self.logger.info(f"✅ 채용공고 저장 성공 - ID: {job_id}, 제목: {job_data['title']}")
+                            else:
+                                self.logger.warning(f"❌ 채용공고 저장 실패: {job_data['title']}")
+                        except Exception as save_error:
+                            self.logger.error(f"❌ DB 저장 중 오류: {save_error}")
+                    else:
+                        self.logger.info(f"채용공고 크롤링 성공: {job_data['title']}")
                 
             except Exception as e:
                 self.logger.error(f"채용공고 크롤링 실패: {url} - {e}")
                 continue
         
-        self.logger.info(f"사람인 크롤링 완료: {len(crawled_jobs)}개 채용공고 수집")
+        if save_to_db:
+            self.logger.info(f"🎉 사람인 크롤링 완료: {len(crawled_jobs)}개 수집, {saved_count}개 DB 저장")
+        else:
+            self.logger.info(f"사람인 크롤링 완료: {len(crawled_jobs)}개 채용공고 수집 (DB 저장 없음)")
+        
         return crawled_jobs
 
 

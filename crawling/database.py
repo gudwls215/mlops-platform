@@ -51,7 +51,11 @@ class DatabaseManager:
                 cursor.execute(query, params)
                 
                 if fetch and cursor.description:
-                    return cursor.fetchall()
+                    result = cursor.fetchall()
+                    # INSERT/UPDATE/DELETE 등의 쿼리도 커밋 필요
+                    if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+                        self.connection.commit()
+                    return result
                 else:
                     self.connection.commit()
                     return cursor.rowcount
@@ -391,6 +395,66 @@ class DatabaseManager:
             self.logger.error(f"자기소개서 통계 조회 실패: {e}")
             return {}
     
+    def save_cover_letter(self, company: str, position: str, year: str, 
+                         content: str, link: str, source: str = 'crawler') -> bool:
+        """자기소개서 데이터 저장"""
+        try:
+            # 제목 생성 (회사명 + 직무명 + 연도)
+            title = f"{company} {position} 합격자소서 ({year})"
+            
+            # 중복 확인
+            check_query = """
+                SELECT id FROM mlops.cover_letter_samples 
+                WHERE company = %s AND position = %s AND content = %s
+                LIMIT 1
+            """
+            existing = self.execute_query(check_query, (company, position, content[:100]))
+            
+            if existing:
+                self.logger.info(f"이미 존재하는 자기소개서: {company} - {position}")
+                return False
+            
+            # 새 데이터 삽입
+            insert_query = """
+                INSERT INTO mlops.cover_letter_samples (
+                    title, company, position, content, application_year, url, source,
+                    is_passed, views, likes, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                ) RETURNING id
+            """
+            
+            current_time = datetime.now()
+            
+            result = self.execute_query(
+                insert_query,
+                (
+                    title,
+                    company,
+                    position,
+                    content,
+                    int(year) if year.isdigit() else datetime.now().year,
+                    link,
+                    source,
+                    True,  # is_passed - 크롤링된 데이터는 합격 자소서로 가정
+                    0,     # views
+                    0,     # likes
+                    current_time,
+                    current_time
+                ),
+                fetch=True
+            )
+            
+            if result:
+                self.logger.info(f"자기소개서 저장 성공: {company} - {position}")
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"자기소개서 저장 실패: {e}")
+            return False
+
     def search_cover_letters(self, company: str = None, position: str = None, 
                            passed_only: bool = False, limit: int = 10) -> List[Dict]:
         """자기소개서 검색"""
