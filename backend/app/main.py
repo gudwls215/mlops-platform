@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import resume, job_posting
+from app.routers import resume, job_posting, speech
 from app.core.config import settings
 
 app = FastAPI(
@@ -21,6 +21,7 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(resume.router, prefix="/api/v1/resume", tags=["resume"])
 app.include_router(job_posting.router, prefix="/api/v1/job", tags=["job"])
+app.include_router(speech.router, tags=["speech"])
 
 @app.get("/")
 async def root():
