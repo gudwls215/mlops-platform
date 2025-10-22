@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -7,8 +7,14 @@ import {
   CardContent,
   Chip,
   Button,
+  TextField,
+  InputAdornment,
+  CircularProgress,
+  Alert,
+  Pagination
 } from '@mui/material';
-import { Work, LocationOn, AttachMoney, Schedule } from '@mui/icons-material';
+import { Work, LocationOn, AttachMoney, Schedule, Search } from '@mui/icons-material';
+import axios from 'axios';
 
 // 임시 채용공고 데이터
 const sampleJobs = [
@@ -59,9 +65,84 @@ const sampleJobs = [
 ];
 
 const JobListPage: React.FC = () => {
+  const [jobs, setJobs] = useState<any[]>(sampleJobs);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(sampleJobs.length);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    // 페이지 로드 시 채용공고 가져오기
+    fetchJobs();
+  }, [page]);
+
+  const fetchJobs = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const skip = (page - 1) * itemsPerPage;
+      const response = await axios.get(
+        `http://localhost:8000/api/v1/job/?skip=${skip}&limit=${itemsPerPage}`
+      );
+      
+      if (response.data.status === 'success') {
+        setJobs(response.data.data.job_postings);
+        setTotal(response.data.data.total);
+      }
+    } catch (err: any) {
+      console.error('채용공고 조회 오류:', err);
+      // API 오류 시 샘플 데이터 사용
+      setJobs(sampleJobs);
+      setTotal(sampleJobs.length);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchKeyword.trim()) {
+      fetchJobs();
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('keyword', searchKeyword);
+      formData.append('skip', '0');
+      formData.append('limit', itemsPerPage.toString());
+      
+      const response = await axios.post(
+        'http://localhost:8000/api/v1/job/search',
+        formData
+      );
+      
+      if (response.data.status === 'success') {
+        setJobs(response.data.data.job_postings);
+        setTotal(response.data.data.total);
+        setPage(1);
+      }
+    } catch (err: any) {
+      console.error('검색 오류:', err);
+      setError('검색 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleApply = (jobId: number) => {
     console.log(`채용공고 ${jobId}에 지원`);
-    // TODO: 지원 로직 구현
+    // TODO: 자기소개서 생성 페이지로 이동
   };
 
   return (
@@ -70,7 +151,7 @@ const JobListPage: React.FC = () => {
         variant="h3" 
         component="h1" 
         gutterBottom 
-        sx={{ textAlign: 'center', mb: 2, fontWeight: 600 }}
+        sx={{ textAlign: 'center', mb: 2, fontWeight: 600, fontSize: { xs: '2rem', md: '2.5rem' } }}
       >
         시니어 친화 채용정보
       </Typography>
@@ -78,12 +159,66 @@ const JobListPage: React.FC = () => {
       <Typography 
         variant="h6" 
         color="text.secondary" 
-        sx={{ textAlign: 'center', mb: 6, fontSize: '1.2rem' }}
+        sx={{ textAlign: 'center', mb: 4, fontSize: '1.2rem' }}
       >
         50대 이상을 우대하는 채용공고를 모아서 보여드립니다
       </Typography>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {/* 검색 바 */}
+      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+        <TextField
+          fullWidth
+          placeholder="회사명, 직무, 키워드로 검색하세요"
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+            style: { fontSize: '1.1rem' }
+          }}
+        />
+        <Button
+          variant="contained"
+          onClick={handleSearch}
+          disabled={loading}
+          sx={{ 
+            fontSize: '1.1rem',
+            px: 4,
+            minWidth: '120px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          검색
+        </Button>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, fontSize: '1.1rem' }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6" sx={{ mt: 2, fontSize: '1.2rem' }}>
+            채용공고를 불러오는 중...
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          <Typography 
+            variant="body1" 
+            sx={{ mb: 3, fontSize: '1.1rem', color: 'text.secondary' }}
+          >
+            총 <strong>{total}</strong>개의 채용공고가 있습니다.
+          </Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {sampleJobs.map((job) => (
           <Card key={job.id} sx={{ p: 2, '&:hover': { boxShadow: 3 } }}>
             <CardContent>
@@ -163,7 +298,23 @@ const JobListPage: React.FC = () => {
             </CardContent>
           </Card>
         ))}
-      </Box>
+          </Box>
+
+          {/* 페이지네이션 */}
+          {total > itemsPerPage && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Pagination
+                count={Math.ceil(total / itemsPerPage)}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                size="large"
+                sx={{ '& .MuiPaginationItem-root': { fontSize: '1.1rem' } }}
+              />
+            </Box>
+          )}
+        </>
+      )}
 
       <Box 
         sx={{ 

@@ -9,8 +9,11 @@ import {
   Tabs,
   Paper,
   Alert,
+  CircularProgress
 } from '@mui/material';
-import { Mic, MicOff, Create, Save } from '@mui/icons-material';
+import { Mic, MicOff, Create, Save, CheckCircle } from '@mui/icons-material';
+import VoiceRecorder from '../components/VoiceRecorder';
+import axios from 'axios';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -40,7 +43,6 @@ function TabPanel(props: TabPanelProps) {
 
 const ResumeCreatePage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,9 +53,15 @@ const ResumeCreatePage: React.FC = () => {
     skills: '',
     experience: ''
   });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedResume, setGeneratedResume] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    setError(null);
+    setSuccessMessage(null);
   };
 
   const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,19 +71,85 @@ const ResumeCreatePage: React.FC = () => {
     }));
   };
 
-  const handleVoiceRecording = () => {
-    setIsRecording(!isRecording);
-    // TODO: 실제 음성 녹음 로직 구현
-    if (!isRecording) {
-      console.log('음성 녹음 시작');
-    } else {
-      console.log('음성 녹음 중지');
+  const handleVoiceRecordingComplete = async (audioBlob: Blob) => {
+    setIsGenerating(true);
+    setError(null);
+    
+    try {
+      // 1. 음성 파일을 텍스트로 변환
+      const transcribeFormData = new FormData();
+      transcribeFormData.append('file', audioBlob, 'recording.webm');
+      
+      const transcribeResponse = await axios.post(
+        'http://localhost:8000/api/speech/transcribe',
+        transcribeFormData
+      );
+      
+      const transcript = transcribeResponse.data.text;
+      
+      // 2. 텍스트에서 이력서 데이터 추출
+      const extractFormData = new FormData();
+      extractFormData.append('text', transcript);
+      
+      const extractResponse = await axios.post(
+        'http://localhost:8000/api/v1/resume/extract-from-text',
+        extractFormData
+      );
+      
+      setGeneratedResume(extractResponse.data.data);
+      setSuccessMessage('음성으로부터 이력서가 성공적으로 생성되었습니다!');
+      
+    } catch (err: any) {
+      console.error('이력서 생성 오류:', err);
+      setError(err.response?.data?.error || '이력서 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  const handleSaveResume = () => {
-    // TODO: 백엔드 API 호출하여 이력서 저장
-    console.log('이력서 저장:', formData);
+  const handleSaveResume = async () => {
+    setIsGenerating(true);
+    setError(null);
+    
+    try {
+      // 직접 입력한 내용을 텍스트로 변환
+      const inputText = `
+        이름: ${formData.name}
+        이메일: ${formData.email}
+        연락처: ${formData.phone}
+        주소: ${formData.address}
+        
+        경력:
+        ${formData.career}
+        
+        학력:
+        ${formData.education}
+        
+        기술/스킬:
+        ${formData.skills}
+        
+        기타 경험:
+        ${formData.experience}
+      `;
+      
+      // 텍스트에서 이력서 데이터 추출
+      const extractFormData = new FormData();
+      extractFormData.append('text', inputText);
+      
+      const extractResponse = await axios.post(
+        'http://localhost:8000/api/v1/resume/extract-from-text',
+        extractFormData
+      );
+      
+      setGeneratedResume(extractResponse.data.data);
+      setSuccessMessage('이력서가 성공적으로 생성되었습니다!');
+      
+    } catch (err: any) {
+      console.error('이력서 생성 오류:', err);
+      setError(err.response?.data?.error || '이력서 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -84,10 +158,63 @@ const ResumeCreatePage: React.FC = () => {
         variant="h3" 
         component="h1" 
         gutterBottom 
-        sx={{ textAlign: 'center', mb: 4, fontWeight: 600 }}
+        sx={{ textAlign: 'center', mb: 4, fontWeight: 600, fontSize: { xs: '2rem', md: '2.5rem' } }}
       >
         이력서 작성하기
       </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, fontSize: '1.1rem' }}>
+          {error}
+        </Alert>
+      )}
+
+      {successMessage && (
+        <Alert 
+          severity="success" 
+          icon={<CheckCircle />}
+          sx={{ mb: 3, fontSize: '1.1rem' }}
+        >
+          {successMessage}
+        </Alert>
+      )}
+
+      {isGenerating && (
+        <Box sx={{ textAlign: 'center', mb: 3, p: 3 }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6" sx={{ mt: 2, fontSize: '1.2rem' }}>
+            AI가 이력서를 생성하고 있습니다...
+          </Typography>
+        </Box>
+      )}
+
+      {generatedResume && (
+        <Paper elevation={3} sx={{ p: 4, mb: 4, backgroundColor: 'success.lighter' }}>
+          <Typography variant="h5" gutterBottom sx={{ fontSize: '1.5rem', fontWeight: 600 }}>
+            ✅ 생성된 이력서
+          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <pre style={{ 
+              whiteSpace: 'pre-wrap', 
+              fontSize: '1.1rem',
+              lineHeight: 1.6,
+              fontFamily: 'inherit'
+            }}>
+              {JSON.stringify(generatedResume, null, 2)}
+            </pre>
+          </Box>
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
+            >
+              이력서 다운로드
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       <Paper elevation={1} sx={{ mb: 3 }}>
         <Tabs 
@@ -110,36 +237,27 @@ const ResumeCreatePage: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           {/* 음성 입력 탭 */}
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
+          <Box sx={{ py: 2 }}>
+            <Typography 
+              variant="h5" 
+              gutterBottom 
+              sx={{ mb: 3, textAlign: 'center', fontSize: '1.5rem' }}
+            >
               음성으로 경력과 경험을 말씀해 주세요
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontSize: '1.1rem' }}>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ mb: 4, textAlign: 'center', fontSize: '1.1rem' }}
+            >
               "안녕하세요, 저는 30년간 회계 업무를 해왔습니다..." 처럼 편안하게 말씀해 주세요.
             </Typography>
             
-            <Button
-              variant={isRecording ? "contained" : "outlined"}
-              color={isRecording ? "secondary" : "primary"}
-              size="large"
-              startIcon={isRecording ? <MicOff /> : <Mic />}
-              onClick={handleVoiceRecording}
-              sx={{ 
-                fontSize: '1.2rem',
-                py: 2,
-                px: 4,
-                minHeight: '64px',
-                minWidth: '200px'
-              }}
-            >
-              {isRecording ? '녹음 중지' : '음성 녹음 시작'}
-            </Button>
-
-            {isRecording && (
-              <Alert severity="info" sx={{ mt: 3, fontSize: '1rem' }}>
-                🎤 녹음 중입니다. 편안하게 말씀해 주세요.
-              </Alert>
-            )}
+            <VoiceRecorder
+              onRecordingComplete={handleVoiceRecordingComplete}
+              maxDuration={300}
+              autoTranscribe={true}
+            />
           </Box>
         </TabPanel>
 
@@ -157,6 +275,8 @@ const ResumeCreatePage: React.FC = () => {
                 onChange={handleInputChange('name')}
                 fullWidth
                 required
+                InputProps={{ style: { fontSize: '1.1rem' } }}
+                InputLabelProps={{ style: { fontSize: '1.1rem' } }}
               />
               <TextField
                 label="이메일"
@@ -165,6 +285,8 @@ const ResumeCreatePage: React.FC = () => {
                 fullWidth
                 required
                 type="email"
+                InputProps={{ style: { fontSize: '1.1rem' } }}
+                InputLabelProps={{ style: { fontSize: '1.1rem' } }}
               />
               <TextField
                 label="연락처"
@@ -172,12 +294,16 @@ const ResumeCreatePage: React.FC = () => {
                 onChange={handleInputChange('phone')}
                 fullWidth
                 required
+                InputProps={{ style: { fontSize: '1.1rem' } }}
+                InputLabelProps={{ style: { fontSize: '1.1rem' } }}
               />
               <TextField
                 label="주소"
                 value={formData.address}
                 onChange={handleInputChange('address')}
                 fullWidth
+                InputProps={{ style: { fontSize: '1.1rem' } }}
+                InputLabelProps={{ style: { fontSize: '1.1rem' } }}
               />
             </Box>
 
@@ -189,6 +315,8 @@ const ResumeCreatePage: React.FC = () => {
               multiline
               rows={4}
               placeholder="어떤 회사에서 어떤 일을 하셨는지 자세히 적어주세요"
+              InputProps={{ style: { fontSize: '1.1rem', lineHeight: 1.6 } }}
+              InputLabelProps={{ style: { fontSize: '1.1rem' } }}
             />
 
             <TextField
@@ -199,6 +327,8 @@ const ResumeCreatePage: React.FC = () => {
               multiline
               rows={2}
               placeholder="최종 학력을 적어주세요"
+              InputProps={{ style: { fontSize: '1.1rem', lineHeight: 1.6 } }}
+              InputLabelProps={{ style: { fontSize: '1.1rem' } }}
             />
 
             <TextField
@@ -209,6 +339,8 @@ const ResumeCreatePage: React.FC = () => {
               multiline
               rows={2}
               placeholder="컴퓨터, 언어, 자격증 등 보유하신 기술을 적어주세요"
+              InputProps={{ style: { fontSize: '1.1rem', lineHeight: 1.6 } }}
+              InputLabelProps={{ style: { fontSize: '1.1rem' } }}
             />
 
             <TextField
@@ -219,6 +351,8 @@ const ResumeCreatePage: React.FC = () => {
               multiline
               rows={3}
               placeholder="자원봉사, 동호회, 특별한 경험 등을 적어주세요"
+              InputProps={{ style: { fontSize: '1.1rem', lineHeight: 1.6 } }}
+              InputLabelProps={{ style: { fontSize: '1.1rem' } }}
             />
           </Box>
         </TabPanel>
