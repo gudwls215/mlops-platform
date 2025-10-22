@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.resume_service import get_resume_service
 from app.services.whisper_service import get_whisper_service
+from app.models import Resume
 from typing import List, Optional
 import logging
 import json
@@ -13,29 +14,229 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
-async def get_resumes(db: Session = Depends(get_db)):
-    """이력서 목록 조회"""
-    return {"message": "이력서 목록 조회 API"}
+async def get_resumes(
+    skip: int = 0,
+    limit: int = 100,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    이력서 목록 조회
+    
+    Args:
+        skip: 건너뛸 레코드 수
+        limit: 조회할 최대 레코드 수
+        user_id: 특정 사용자의 이력서만 조회 (선택사항)
+    """
+    try:
+        query = db.query(Resume).filter(Resume.is_active == True)
+        
+        if user_id:
+            query = query.filter(Resume.user_id == user_id)
+        
+        total = query.count()
+        resumes = query.offset(skip).limit(limit).all()
+        
+        return JSONResponse(content={
+            "status": "success",
+            "data": {
+                "total": total,
+                "skip": skip,
+                "limit": limit,
+                "resumes": [
+                    {
+                        "id": r.id,
+                        "user_id": r.user_id,
+                        "title": r.title,
+                        "skills": json.loads(r.skills) if r.skills else [],
+                        "created_at": r.created_at.isoformat() if r.created_at else None,
+                        "updated_at": r.updated_at.isoformat() if r.updated_at else None
+                    }
+                    for r in resumes
+                ]
+            }
+        })
+    except Exception as e:
+        logger.error(f"이력서 목록 조회 오류: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 @router.post("/")
-async def create_resume(db: Session = Depends(get_db)):
-    """이력서 생성"""
-    return {"message": "이력서 생성 API"}
+async def create_resume(
+    title: str = Form(...),
+    content: str = Form(...),
+    skills: Optional[str] = Form(None),
+    experience: Optional[str] = Form(None),
+    education: Optional[str] = Form(None),
+    user_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    이력서 생성
+    
+    Args:
+        title: 이력서 제목
+        content: 이력서 전체 내용 (JSON 문자열)
+        skills: 기술스택 (JSON 배열 문자열)
+        experience: 경력 정보 (JSON 문자열)
+        education: 학력 정보 (JSON 문자열)
+        user_id: 사용자 ID
+    """
+    try:
+        new_resume = Resume(
+            user_id=user_id,
+            title=title,
+            content=content,
+            skills=skills,
+            experience=experience,
+            education=education
+        )
+        
+        db.add(new_resume)
+        db.commit()
+        db.refresh(new_resume)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "data": {
+                "id": new_resume.id,
+                "user_id": new_resume.user_id,
+                "title": new_resume.title,
+                "created_at": new_resume.created_at.isoformat()
+            },
+            "message": "이력서가 성공적으로 생성되었습니다."
+        })
+    except Exception as e:
+        db.rollback()
+        logger.error(f"이력서 생성 오류: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 @router.get("/{resume_id}")
 async def get_resume(resume_id: int, db: Session = Depends(get_db)):
-    """특정 이력서 조회"""
-    return {"message": f"이력서 {resume_id} 조회 API"}
+    """특정 이력서 상세 조회"""
+    try:
+        resume = db.query(Resume).filter(
+            Resume.id == resume_id,
+            Resume.is_active == True
+        ).first()
+        
+        if not resume:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": "이력서를 찾을 수 없습니다."}
+            )
+        
+        return JSONResponse(content={
+            "status": "success",
+            "data": {
+                "id": resume.id,
+                "user_id": resume.user_id,
+                "title": resume.title,
+                "content": json.loads(resume.content) if resume.content else {},
+                "skills": json.loads(resume.skills) if resume.skills else [],
+                "experience": json.loads(resume.experience) if resume.experience else [],
+                "education": json.loads(resume.education) if resume.education else [],
+                "created_at": resume.created_at.isoformat() if resume.created_at else None,
+                "updated_at": resume.updated_at.isoformat() if resume.updated_at else None
+            }
+        })
+    except Exception as e:
+        logger.error(f"이력서 조회 오류: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 @router.put("/{resume_id}")
-async def update_resume(resume_id: int, db: Session = Depends(get_db)):
+async def update_resume(
+    resume_id: int,
+    title: Optional[str] = Form(None),
+    content: Optional[str] = Form(None),
+    skills: Optional[str] = Form(None),
+    experience: Optional[str] = Form(None),
+    education: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
     """이력서 수정"""
-    return {"message": f"이력서 {resume_id} 수정 API"}
+    try:
+        resume = db.query(Resume).filter(
+            Resume.id == resume_id,
+            Resume.is_active == True
+        ).first()
+        
+        if not resume:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": "이력서를 찾을 수 없습니다."}
+            )
+        
+        # 제공된 필드만 업데이트
+        if title is not None:
+            resume.title = title
+        if content is not None:
+            resume.content = content
+        if skills is not None:
+            resume.skills = skills
+        if experience is not None:
+            resume.experience = experience
+        if education is not None:
+            resume.education = education
+        
+        db.commit()
+        db.refresh(resume)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "data": {
+                "id": resume.id,
+                "title": resume.title,
+                "updated_at": resume.updated_at.isoformat() if resume.updated_at else None
+            },
+            "message": "이력서가 성공적으로 수정되었습니다."
+        })
+    except Exception as e:
+        db.rollback()
+        logger.error(f"이력서 수정 오류: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 @router.delete("/{resume_id}")
 async def delete_resume(resume_id: int, db: Session = Depends(get_db)):
-    """이력서 삭제"""
-    return {"message": f"이력서 {resume_id} 삭제 API"}
+    """이력서 삭제 (소프트 삭제)"""
+    try:
+        resume = db.query(Resume).filter(
+            Resume.id == resume_id,
+            Resume.is_active == True
+        ).first()
+        
+        if not resume:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": "이력서를 찾을 수 없습니다."}
+            )
+        
+        # 소프트 삭제
+        resume.is_active = False
+        db.commit()
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": "이력서가 성공적으로 삭제되었습니다."
+        })
+    except Exception as e:
+        db.rollback()
+        logger.error(f"이력서 삭제 오류: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 
 @router.post("/extract-from-text")
