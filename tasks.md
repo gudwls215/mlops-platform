@@ -83,18 +83,18 @@
   - [x] PostgreSQL 저장 로직 (mlops 스키마 대상)
   - [x] 데이터 검증 및 품질 체크
 
-- [ ] Airflow 기본 설정
-  - [ ] Apache Airflow 설치
-  - [ ] 기본 DAG 생성 (데이터 수집용)
-  - [ ] 스케줄링 설정 (매일 새벽 2시)
-  - [ ] 웹 UI 접근 설정
+- [x] Airflow 기본 설정
+  - [x] Apache Airflow 설치
+  - [x] 기본 DAG 생성 (데이터 수집용)
+  - [x] 스케줄링 설정 (매일 새벽 2시)
+  - [x] 웹 UI 접근 설정
 
 ### Week 5-6: 핵심 AI 기능 구현
-- [ ] OpenAI API 설정
-  - [ ] OpenAI API 키 설정
-  - [ ] GPT-4 API 연동 테스트
-  - [ ] 토큰 사용량 모니터링 설정
-  - [ ] 비용 제한 설정
+- [x] OpenAI API 설정
+  - [x] OpenAI API 키 설정
+  - [x] GPT-4 API 연동 테스트
+  - [x] 토큰 사용량 모니터링 설정
+  - [x] 비용 제한 설정
 
 - [ ] Whisper 모델 배포
   - [ ] OpenAI Whisper 로컬 설치
