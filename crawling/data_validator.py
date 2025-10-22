@@ -270,8 +270,8 @@ class DataValidator:
             try:
                 self.db.connect()
                 
-                # 채용공고 URL 중복 확인
-                job_query = "SELECT COUNT(*) as count FROM mlops.job_postings WHERE url = %s"
+                # 채용공고 URL 중복 확인 - source_url 컬럼 사용
+                job_query = "SELECT COUNT(*) as count FROM mlops.job_postings WHERE source_url = %s"
                 job_count = self.db.execute_query(job_query, (url,))[0]['count']
                 
                 # 자기소개서 URL 중복 확인  

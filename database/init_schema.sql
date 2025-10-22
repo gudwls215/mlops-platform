@@ -1,5 +1,18 @@
 -- MLOps Platform Database Schema
 -- PostgreSQL 스키마 생성 및 초기 데이터 설정
+--
+-- 데이터베이스 구조:
+--   postgres(DB) → mlops(스키마) → 테이블들
+--
+-- 접속 정보:
+--   Host: 114.202.2.226
+--   Port: 5433
+--   Database: postgres (mlops DB가 아님!)
+--   Schema: mlops
+--
+-- 사용 방법:
+--   psql -h 114.202.2.226 -p 5433 -U postgres -d postgres -f init_schema.sql
+--
 
 -- 스키마 생성
 CREATE SCHEMA IF NOT EXISTS mlops;
@@ -55,7 +68,7 @@ CREATE TABLE IF NOT EXISTS mlops.job_postings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- 자기소개서 테이블
+-- 자기소개서 테이블 (사용자가 작성한 자소서)
 CREATE TABLE IF NOT EXISTS mlops.cover_letters (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES mlops.users(id) ON DELETE CASCADE,
@@ -65,6 +78,27 @@ CREATE TABLE IF NOT EXISTS mlops.cover_letters (
     content TEXT NOT NULL,
     generated_by_ai BOOLEAN DEFAULT FALSE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 자기소개서 샘플 테이블 (크롤링한 합격 자소서)
+CREATE TABLE IF NOT EXISTS mlops.cover_letter_samples (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    company VARCHAR(200) NOT NULL,
+    position VARCHAR(200),
+    department VARCHAR(200),
+    experience_level VARCHAR(100),
+    content TEXT NOT NULL,
+    is_passed BOOLEAN DEFAULT TRUE,
+    application_year INTEGER,
+    keywords TEXT[],
+    url VARCHAR(1000) UNIQUE NOT NULL,
+    url_hash VARCHAR(64),
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    source VARCHAR(100) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
@@ -105,6 +139,12 @@ CREATE INDEX IF NOT EXISTS ix_mlops_job_postings_company ON mlops.job_postings(c
 CREATE INDEX IF NOT EXISTS ix_mlops_job_postings_location ON mlops.job_postings(location);
 CREATE INDEX IF NOT EXISTS ix_mlops_cover_letters_user_id ON mlops.cover_letters(user_id);
 CREATE INDEX IF NOT EXISTS ix_mlops_cover_letters_job_posting_id ON mlops.cover_letters(job_posting_id);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_samples_company ON mlops.cover_letter_samples(company);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_samples_position ON mlops.cover_letter_samples(position);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_samples_is_passed ON mlops.cover_letter_samples(is_passed);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_samples_year ON mlops.cover_letter_samples(application_year);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_samples_created_at ON mlops.cover_letter_samples(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cover_letters_url_hash_unique ON mlops.cover_letter_samples(url_hash);
 CREATE INDEX IF NOT EXISTS ix_mlops_prediction_logs_user_id ON mlops.prediction_logs(user_id);
 CREATE INDEX IF NOT EXISTS ix_mlops_prediction_logs_model_name ON mlops.prediction_logs(model_name);
 CREATE INDEX IF NOT EXISTS ix_mlops_prediction_logs_created_at ON mlops.prediction_logs(created_at);
@@ -126,6 +166,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON mlops.users FOR EACH ROW
 CREATE TRIGGER update_resumes_updated_at BEFORE UPDATE ON mlops.resumes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_job_postings_updated_at BEFORE UPDATE ON mlops.job_postings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_cover_letters_updated_at BEFORE UPDATE ON mlops.cover_letters FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_cover_letter_samples_updated_at BEFORE UPDATE ON mlops.cover_letter_samples FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_job_applications_updated_at BEFORE UPDATE ON mlops.job_applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- 샘플 데이터 (개발용)
@@ -145,6 +186,7 @@ COMMENT ON SCHEMA mlops IS 'MLOps Platform Database Schema for Senior Job Seeker
 COMMENT ON TABLE mlops.users IS '사용자 정보 테이블';
 COMMENT ON TABLE mlops.resumes IS '이력서 정보 테이블';
 COMMENT ON TABLE mlops.job_postings IS '채용 공고 테이블';
-COMMENT ON TABLE mlops.cover_letters IS '자기소개서 테이블';
+COMMENT ON TABLE mlops.cover_letters IS '사용자가 작성한 자기소개서 테이블';
+COMMENT ON TABLE mlops.cover_letter_samples IS '크롤링한 합격 자기소개서 샘플 테이블 (AI 학습용)';
 COMMENT ON TABLE mlops.prediction_logs IS 'ML 모델 예측 로그 테이블';
 COMMENT ON TABLE mlops.job_applications IS '지원 내역 테이블';

@@ -75,13 +75,16 @@ def run_saramin_crawler():
         
         logging.info("사람인 크롤러 시작...")
         crawler = SaraminCrawler()
+        db_manager = DatabaseManager()
         
-        # 크롤러 실행 (실시간 DB 저장 방식, Linkareer와 동일)
-        result = crawler.crawl_jobs(max_jobs=100, save_to_db=True)
+        # 크롤러 실행 (최대 100개 채용공고)
+        result = crawler.crawl_jobs(max_jobs=100)
         
         if result and len(result) > 0:
-            logging.info(f"사람인 크롤러 완료: {len(result)}개 채용공고 수집 및 저장")
-            return f"SUCCESS: {len(result)}개 채용공고 수집 및 저장"
+            # 데이터베이스에 저장
+            inserted_count = db_manager.bulk_insert_job_postings(result)
+            logging.info(f"사람인 크롤러 완료: {len(result)}개 채용공고 수집, {inserted_count}개 저장")
+            return f"SUCCESS: {len(result)}개 채용공고 수집, {inserted_count}개 저장"
         else:
             logging.warning("사람인 크롤러: 수집된 데이터가 없습니다")
             return "WARNING: 수집된 데이터 없음"
@@ -116,7 +119,7 @@ def run_linkareer_crawler():
         # 일반 크롤러로 폴백
         from linkareer_crawler import LinkareerCoverLetterCrawler
         
-        logging.info("Linkareer 일반 크롤러 시작...22")
+        logging.info("Linkareer 일반 크롤러 시작...")
         crawler = LinkareerCoverLetterCrawler()
         result = crawler.crawl(max_items=50)  # crawl 메서드 파라미터 추가
         

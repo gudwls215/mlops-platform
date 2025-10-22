@@ -17,7 +17,7 @@ class DatabaseManager:
     def __init__(self, database_url: str = None):
         # 올바른 패스워드로 DATABASE_URL 설정
         if database_url is None:
-            database_url = 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/mlops'
+            database_url = 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/postgres'
         self.database_url = database_url
         self.connection = None
         
@@ -28,7 +28,11 @@ class DatabaseManager:
     def connect(self):
         """데이터베이스 연결"""
         try:
-            self.connection = psycopg2.connect(self.database_url)
+            # 락 타임아웃 설정 (10초)
+            self.connection = psycopg2.connect(
+                self.database_url,
+                options='-c statement_timeout=10000 -c lock_timeout=5000'
+            )
             self.logger.info("데이터베이스 연결 성공")
         except Exception as e:
             self.logger.error(f"데이터베이스 연결 실패: {e}")
@@ -66,43 +70,29 @@ class DatabaseManager:
             raise
     
     def insert_job_posting(self, job_data: Dict) -> int:
-        """채용공고 데이터 삽입"""
+        """채용공고 데이터 삽입 (UPSERT 방식으로 개선)"""
         try:
-            # 중복 확인
-            check_query = """
-                SELECT id FROM mlops.job_postings 
-                WHERE url = %s OR (title = %s AND company = %s)
-                LIMIT 1
-            """
-            existing = self.execute_query(
-                check_query, 
-                (job_data['url'], job_data['title'], job_data['company'])
-            )
-            
-            if existing:
-                self.logger.info(f"이미 존재하는 채용공고: {job_data['title']} - {job_data['company']}")
-                return existing[0]['id']
-            
-            # 새 데이터 삽입 (mlops 스키마에 맞춤)
-            insert_query = """
+            # UPSERT로 중복 확인과 삽입을 원자적으로 처리
+            upsert_query = """
                 INSERT INTO mlops.job_postings (
-                    title, company, location, salary, employment_type,
-                    experience, education, main_duties, qualifications, preferences,
-                    deadline, posted_date, url, source, is_senior_friendly,
-                    created_at, updated_at
+                    title, company, description, requirements, 
+                    salary_min, salary_max, location, employment_type,
+                    experience_level, skills_required, deadline, source_url,
+                    is_active, created_at, updated_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                ) RETURNING id
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (source_url) 
+                DO UPDATE SET
+                    title = EXCLUDED.title,
+                    company = EXCLUDED.company,
+                    description = EXCLUDED.description,
+                    requirements = EXCLUDED.requirements,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING id, (xmax = 0) AS inserted
             """
             
             # 날짜 처리
-            posted_at = None
-            if job_data.get('posted_date'):
-                try:
-                    posted_at = datetime.strptime(job_data['posted_date'], '%Y-%m-%d')
-                except:
-                    pass
-            
             deadline = None
             if job_data.get('deadline'):
                 try:
@@ -110,30 +100,51 @@ class DatabaseManager:
                 except:
                     pass
             
+            # description과 requirements 생성
+            description = job_data.get('main_duties', '') or job_data.get('description', '') or '상세 내용 없음'
+            requirements = job_data.get('qualifications', '') or job_data.get('requirements', '') or '자격 요건 없음'
+            
+            # salary 처리
+            salary_min = None
+            salary_max = None
+            salary_str = job_data.get('salary', '')
+            if salary_str and salary_str != '회사 내규에 따름':
+                # 급여 파싱 로직 (간단한 예시)
+                try:
+                    if '~' in salary_str:
+                        parts = salary_str.replace('만원', '').split('~')
+                        salary_min = int(parts[0].strip()) * 10000
+                        salary_max = int(parts[1].strip()) * 10000
+                except:
+                    pass
+            
             params = (
                 job_data.get('title', ''),
                 job_data.get('company', ''),
+                description,
+                requirements,
+                salary_min,
+                salary_max,
                 job_data.get('location', ''),
-                job_data.get('salary', ''),
                 job_data.get('employment_type', ''),
                 job_data.get('experience', ''),
-                job_data.get('education', ''),
-                job_data.get('main_duties', ''),
-                job_data.get('qualifications', ''),
-                job_data.get('preferences', ''),
+                job_data.get('skills_required', ''),
                 deadline,
-                posted_at,
                 job_data.get('url', ''),
-                job_data.get('source', 'saramin'),
-                True,  # is_senior_friendly (이미 필터링됨)
+                True,  # is_active
                 datetime.now(),
                 datetime.now()
             )
             
-            result = self.execute_query(insert_query, params, fetch=True)
+            result = self.execute_query(upsert_query, params, fetch=True)
             job_id = result[0]['id']
+            inserted = result[0]['inserted']
             
-            self.logger.info(f"채용공고 삽입 성공: ID {job_id} - {job_data['title']}")
+            if inserted:
+                self.logger.info(f"채용공고 신규 삽입 성공: ID {job_id} - {job_data['title']}")
+            else:
+                self.logger.info(f"기존 채용공고 업데이트: ID {job_id} - {job_data['title']}")
+            
             return job_id
             
         except Exception as e:

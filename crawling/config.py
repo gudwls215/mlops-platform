@@ -4,7 +4,7 @@
 import os
 
 # 데이터베이스 설정
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/mlops')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:xlxldpa%21%40%23@114.202.2.226:5433/postgres')
 
 # 크롤링 설정
 USER_AGENTS = [
