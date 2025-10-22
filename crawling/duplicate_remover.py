@@ -154,9 +154,10 @@ class DuplicateRemover:
         self.db.connect()
         
         try:
-            # 모든 채용공고 데이터 조회
+            # 모든 채용공고 데이터 조회 (source_url 컬럼 사용)
             query = """
-            SELECT id, url, title, company, main_duties, qualifications, preferences,
+            SELECT id, source_url, title, company, description as main_duties, 
+                   requirements as qualifications, '' as preferences,
                    created_at, updated_at
             FROM mlops.job_postings
             ORDER BY created_at DESC
@@ -189,8 +190,8 @@ class DuplicateRemover:
                     is_duplicate = False
                     duplicate_reason = []
                     
-                    # URL 중복 체크
-                    if self._is_url_duplicate(job1.get('url', ''), job2.get('url', '')):
+                    # URL 중복 체크 (source_url 사용)
+                    if self._is_url_duplicate(job1.get('source_url', ''), job2.get('source_url', '')):
                         is_duplicate = True
                         duplicate_reason.append('URL')
                         self.stats['url_duplicates'] += 1
@@ -468,75 +469,28 @@ class DuplicateRemover:
     
     def add_unique_constraints(self):
         """
-        유니크 제약 조건 추가 (중복 방지)
+        유니크 제약 조건 추가 (중복 방지) - job_postings는 스킵 (source_url에 UNIQUE 제약조건 있음)
         """
-        self.logger.info("데이터베이스 유니크 제약 조건 추가")
+        self.logger.info("데이터베이스 유니크 제약 조건 확인")
         
         self.db.connect()
         
         try:
-            # URL 해시 컬럼이 없으면 추가
-            alter_job_postings = """
-            DO $$ 
-            BEGIN 
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = 'mlops' AND table_name = 'job_postings' 
-                    AND column_name = 'url_hash'
-                ) THEN
-                    ALTER TABLE mlops.job_postings ADD COLUMN url_hash VARCHAR(32);
-                END IF;
-            END $$;
-            """
+            # job_postings는 source_url에 이미 UNIQUE 제약조건이 있으므로 스킵
+            self.logger.info("job_postings: source_url UNIQUE 제약조건 사용 (url_hash 불필요)")
             
-            alter_cover_letters = """
-            DO $$ 
-            BEGIN 
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = 'mlops' AND table_name = 'cover_letter_samples' 
-                    AND column_name = 'url_hash'
-                ) THEN
-                    ALTER TABLE mlops.cover_letter_samples ADD COLUMN url_hash VARCHAR(32);
-                END IF;
-            END $$;
-            """
-            
-            self.db.execute_query(alter_job_postings, fetch=False)
-            self.db.execute_query(alter_cover_letters, fetch=False)
-            
-            # 기존 데이터의 해시값 업데이트
-            update_job_hash = """
-            UPDATE mlops.job_postings 
-            SET url_hash = MD5(LOWER(TRIM(url))) 
-            WHERE url IS NOT NULL AND url_hash IS NULL
-            """
-            
+            # cover_letter_samples만 처리 (url_hash 컬럼이 이미 있음)
+            # 기존 데이터의 해시값 업데이트만 수행
             update_cover_hash = """
             UPDATE mlops.cover_letter_samples 
             SET url_hash = MD5(LOWER(TRIM(url))) 
-            WHERE url IS NOT NULL AND url_hash IS NULL
+            WHERE url IS NOT NULL AND (url_hash IS NULL OR url_hash = '')
             """
             
-            self.db.execute_query(update_job_hash, fetch=False)
+            # cover_letter_samples만 업데이트
             self.db.execute_query(update_cover_hash, fetch=False)
             
-            # 유니크 인덱스 생성 (이미 있으면 무시)
-            create_job_index = """
-            DO $$ 
-            BEGIN 
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes 
-                    WHERE schemaname = 'mlops' AND tablename = 'job_postings' 
-                    AND indexname = 'idx_job_postings_url_hash_unique'
-                ) THEN
-                    CREATE UNIQUE INDEX idx_job_postings_url_hash_unique 
-                    ON mlops.job_postings(url_hash) 
-                    WHERE url_hash IS NOT NULL;
-                END IF;
-            END $$;
-            """
-            
+            # cover_letter_samples 유니크 인덱스만 생성
             create_cover_index = """
             DO $$ 
             BEGIN 
@@ -552,7 +506,6 @@ class DuplicateRemover:
             END $$;
             """
             
-            self.db.execute_query(create_job_index, fetch=False)
             self.db.execute_query(create_cover_index, fetch=False)
             
             self.db.connection.commit()

@@ -31,14 +31,23 @@ class SaraminCrawler(RequestsCrawler):
         self.db_manager = DatabaseManager()
     
     def get_job_urls(self, category: str = None, page_limit: int = 5) -> List[str]:
-        """채용공고 URL 목록 가져오기"""
+        """채용공고 URL 목록 가져오기 (개선: 랜덤 페이지 시작, 키워드 로테이션)"""
         job_urls = []
         
-        # 시니어 관련 키워드로 검색
-        for keyword in SENIOR_KEYWORDS[:3]:  # 상위 3개 키워드만 사용
+        # 키워드 랜덤 셔플 (매번 다른 키워드 순서)
+        import random
+        shuffled_keywords = SENIOR_KEYWORDS.copy()
+        random.shuffle(shuffled_keywords)
+        
+        # 시니어 관련 키워드로 검색 (상위 3개)
+        for keyword in shuffled_keywords[:3]:
             try:
-                for page in range(1, page_limit + 1):
-                    search_url = f"{self.base_url}/zf_user/search/recruit?searchType=search&searchword={urllib.parse.quote(keyword)}&recruitPage={page}"
+                # 랜덤 시작 페이지 (1~3 중 선택)
+                start_page = random.randint(1, 3)
+                
+                for page in range(start_page, start_page + page_limit):
+                    # 날짜 정렬 추가 (최신순)
+                    search_url = f"{self.base_url}/zf_user/search/recruit?searchType=search&searchword={urllib.parse.quote(keyword)}&recruitPage={page}&recruitSort=relation&recruitPageCount=40"
                     
                     self.logger.info(f"검색 페이지 크롤링: {search_url}")
                     html = self.fetch_page(search_url)
@@ -66,13 +75,22 @@ class SaraminCrawler(RequestsCrawler):
                             if full_url not in job_urls:
                                 job_urls.append(full_url)
                     
-                    self.logger.info(f"페이지 {page}에서 {len(job_links)}개 링크 수집")
+                    self.logger.info(f"키워드 '{keyword}' 페이지 {page}에서 {len(job_links)}개 링크 수집 (누적: {len(job_urls)}개)")
+                    
+                    # 충분한 URL을 수집했으면 중단
+                    if len(job_urls) >= 150:
+                        self.logger.info(f"목표 URL 개수 도달 ({len(job_urls)}개), 수집 중단")
+                        break
                     
             except Exception as e:
                 self.logger.error(f"키워드 '{keyword}' 검색 중 오류: {e}")
                 continue
+            
+            # 키워드당 충분한 URL 수집 시 중단
+            if len(job_urls) >= 150:
+                break
         
-        self.logger.info(f"총 {len(job_urls)}개 채용공고 URL 수집 완료")
+        self.logger.info(f"총 {len(job_urls)}개 고유 채용공고 URL 수집 완료 (중복 제거됨)")
         return job_urls
     
     def parse_job_listing(self, html: str, url: str = '') -> Optional[Dict]:
