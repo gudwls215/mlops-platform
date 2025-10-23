@@ -190,8 +190,14 @@
     - 백업 보관 기간: 30일
     - DEPLOYMENT.md 작성 (배포 가이드)
 
-- [ ] MVP 출시
-  - [ ] 소규모 테스트 유저 초대
+- [x] MVP 출시
+  - [x] 소규모 테스트 유저 초대
+    - [x] MVP 테스트 가이드 문서 작성 (MVP_TEST_GUIDE.md)
+    - [x] 이메일 템플릿 작성 (초대, 리마인더, 감사, 피드백 요청)
+    - [x] 테스트 계획 수립 (MVP_TEST_PLAN.md)
+    - [x] 테스터 관리 데이터베이스 모델 생성 (TestUser)
+    - [x] 모집 채널 및 전략 수립
+    - [x] 피드백 분석 프레임워크 설계
   - [x] 피드백 수집 시스템 구축
     - [x] Feedback 데이터베이스 모델 생성
     - [x] Feedback API 엔드포인트 구현 (POST, GET stats, GET recent, GET by ID)
