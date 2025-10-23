@@ -140,8 +140,14 @@ JSON 형식으로 반환하세요."""
 
 총 500-800자 분량으로 작성하세요."""
 
-        # 채용공고 정보
-        job_info = f"""
+        # 채용공고 정보 (문자열 또는 딕셔너리 지원)
+        if isinstance(job_posting, str):
+            job_info = f"""
+# 채용공고 정보
+{job_posting}
+"""
+        else:
+            job_info = f"""
 # 채용공고 정보
 - 회사: {job_posting.get('company', 'N/A')}
 - 직무: {job_posting.get('job_title', 'N/A')}

@@ -66,9 +66,16 @@ class MatchingService:
         
         # 학력 정보
         if "학력정보" in resume_data:
-            for edu in resume_data["학력정보"]:
-                if "전공" in edu:
-                    parts.append(edu["전공"])
+            edu_data = resume_data["학력정보"]
+            # 리스트인 경우
+            if isinstance(edu_data, list):
+                for edu in edu_data:
+                    if "전공" in edu:
+                        parts.append(edu["전공"])
+            # 딕셔너리인 경우
+            elif isinstance(edu_data, dict):
+                if "전공" in edu_data:
+                    parts.append(edu_data["전공"])
         
         # 기술스택/자격증
         if "기술스택/자격증" in resume_data:
