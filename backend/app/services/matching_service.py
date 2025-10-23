@@ -277,6 +277,13 @@ class MatchingService:
     ) -> Dict[str, Any]:
         """종합 매칭 점수 계산"""
         
+        # 입력 타입 검증
+        if not isinstance(resume_data, dict):
+            raise TypeError(f"resume_data must be a dictionary, got {type(resume_data).__name__}")
+        
+        if not isinstance(job_posting, dict):
+            raise TypeError(f"job_posting must be a dictionary, got {type(job_posting).__name__}")
+        
         # 기본 가중치
         if weights is None:
             weights = {

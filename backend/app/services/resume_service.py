@@ -36,6 +36,15 @@ class ResumeService:
         """
         logger.info(f"Extracting resume data from {source}")
         
+        # 입력 검증
+        if not text or not text.strip():
+            logger.warning("Empty or whitespace-only text provided")
+            return {
+                "status": "error",
+                "error": "입력 텍스트가 비어있습니다. 이력서 정보를 입력해주세요.",
+                "error_code": "EMPTY_INPUT"
+            }
+        
         # GPT-4o-mini 프롬프트 작성 (명확한 JSON 출력 요구)
         system_prompt = """당신은 이력서 작성 전문가입니다.
 주어진 텍스트에서 이력서에 필요한 정보를 추출하여 JSON 형식으로 구조화하세요.
