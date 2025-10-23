@@ -5,10 +5,10 @@ class Settings(BaseSettings):
     # 데이터베이스 설정
     DATABASE_HOST: str = "114.202.2.226"
     DATABASE_PORT: int = 5433
-    DATABASE_NAME: str = "mlops"
+    DATABASE_NAME: str = "postgres"
     DATABASE_SCHEMA: str = "mlops"
     DATABASE_USER: str = "postgres"
-    DATABASE_PASSWORD: str = ""
+    DATABASE_PASSWORD: str = "xlxldpa!@#"
     
     # OpenAI API 설정
     OPENAI_API_KEY: Optional[str] = None
@@ -28,5 +28,6 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # 추가 필드 무시
 
 settings = Settings()
