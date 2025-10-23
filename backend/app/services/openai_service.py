@@ -17,7 +17,7 @@ class OpenAIService:
     def __init__(self):
         """OpenAI 클라이언트 초기화"""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
         
         if not self.api_key or self.api_key == "your-openai-api-key-here":
@@ -73,7 +73,7 @@ class OpenAIService:
             예상 비용 (USD)
         """
         model = model or self.model
-        pricing = self.pricing.get(model, self.pricing["gpt-5-mini"])
+        pricing = self.pricing.get(model, self.pricing["gpt-4o-mini"])
         
         prompt_cost = (prompt_tokens / 1000) * pricing["prompt"]
         completion_cost = (completion_tokens / 1000) * pricing["completion"]
@@ -128,15 +128,27 @@ class OpenAIService:
             테스트 결과 딕셔너리
         """
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "Hello! This is a connection test."}
-                ],
-                max_tokens=50,
-                temperature=0.7
-            )
+            # gpt-4o-mini는 max_completion_tokens 사용하고 temperature는 1.0만 지원
+            if "gpt-4o" in self.model or "gpt-5" in self.model:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "Hello! This is a connection test."}
+                    ],
+                    max_completion_tokens=50
+                    # temperature는 기본값 1.0 사용
+                )
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "Hello! This is a connection test."}
+                    ],
+                    max_tokens=50,
+                    temperature=0.7
+                )
             
             # 사용량 통계 업데이트
             self.update_usage_stats(response.usage.model_dump())
@@ -189,12 +201,21 @@ class OpenAIService:
             
             logger.info(f"Generating completion with {estimated_prompt_tokens} estimated prompt tokens")
             
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature
-            )
+            # gpt-4o-mini는 max_completion_tokens 사용하고 temperature는 1.0만 지원
+            if "gpt-4o" in model or "gpt-5" in model:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_completion_tokens=max_tokens
+                    # temperature는 기본값 1.0 사용 (다른 값 지원 안 함)
+                )
+            else:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
             
             # 사용량 통계 업데이트
             self.update_usage_stats(response.usage.model_dump())
