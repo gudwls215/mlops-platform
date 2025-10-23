@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
     container_name: mlops-backend
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432

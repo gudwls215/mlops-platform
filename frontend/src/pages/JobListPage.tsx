@@ -85,7 +85,7 @@ const JobListPage: React.FC = () => {
     try {
       const skip = (page - 1) * itemsPerPage;
       const response = await axios.get(
-        `http://localhost:8000/api/v1/job/?skip=${skip}&limit=${itemsPerPage}`
+        `http://localhost:9000/api/v1/job/?skip=${skip}&limit=${itemsPerPage}`
       );
       
       if (response.data.status === 'success') {
@@ -118,7 +118,7 @@ const JobListPage: React.FC = () => {
       formData.append('limit', itemsPerPage.toString());
       
       const response = await axios.post(
-        'http://localhost:8000/api/v1/job/search',
+        'http://localhost:9000/api/v1/job/search',
         formData
       );
       

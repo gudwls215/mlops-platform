@@ -1,0 +1,15 @@
+# Crontab 설정 예시
+# 이 파일을 직접 편집하지 말고, `crontab -e` 명령으로 설정하세요.
+#
+# 백업 작업 스케줄링
+# crontab -e 명령 실행 후 아래 내용 추가
+#
+
+# 매일 새벽 2시에 백업 실행
+0 2 * * * cd /home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/backend && ./backup.sh >> /var/log/mlops/backup.log 2>&1
+
+# 매주 일요일 새벽 3시에 전체 백업 (추가 복사본)
+0 3 * * 0 cd /home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/backend && ./backup.sh >> /var/log/mlops/backup_weekly.log 2>&1
+
+# 백업 로그 확인 (매일 오전 9시)
+# 0 9 * * * tail -n 50 /var/log/mlops/backup.log | mail -s "MLOps Backup Report" admin@example.com

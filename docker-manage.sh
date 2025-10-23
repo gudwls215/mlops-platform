@@ -55,9 +55,9 @@ start_dev() {
     
     docker-compose -f docker-compose.dev.yml up -d
     print_success "개발 환경이 시작되었습니다!"
-    print_info "백엔드: http://localhost:8000"
+    print_info "백엔드: http://localhost:9000"
     print_info "MLflow: http://localhost:5000"
-    print_info "API 문서: http://localhost:8000/docs"
+    print_info "API 문서: http://localhost:9000/docs"
 }
 
 # 프로덕션 환경 시작

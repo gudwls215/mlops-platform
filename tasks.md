@@ -168,11 +168,27 @@
     - 동시성 및 상태 관리: 2/2 통과
     - 입력 검증 및 타입 체크 로직 강화
 
-- [ ] 배포 준비
-  - [ ] Production 환경 설정
-  - [ ] 환경 변수 분리
-  - [ ] 로그 설정
-  - [ ] 백업 스크립트 작성
+- [x] 배포 준비
+  - [x] Production 환경 설정
+    - .env.production 생성 (보안 설정, DB 풀, OpenAI, Redis, 로깅 등)
+    - production_config.py 생성 (Pydantic 검증)
+    - setup_production.sh 생성 (8단계 자동화)
+    - nginx.conf 생성 (SSL, 보안 헤더, 리버스 프록시)
+  - [x] 환경 변수 분리
+    - 개발용: .env (기존)
+    - 프로덕션용: .env.production (신규)
+    - 검증 로직: validate_production_settings()
+  - [x] 로그 설정
+    - logging_config.py 생성 (JSON 포맷터)
+    - 로그 로테이션: 10MB, 10개 백업
+    - 에러 전용 로그 파일 분리
+    - 요청/에러 로깅 헬퍼 클래스
+  - [x] 백업 스크립트 작성
+    - backup.sh 생성 (DB + 업로드 파일)
+    - restore.sh 생성 (복구 스크립트)
+    - crontab.example 생성 (자동화 예시)
+    - 백업 보관 기간: 30일
+    - DEPLOYMENT.md 작성 (배포 가이드)
 
 - [ ] MVP 출시
   - [ ] 소규모 테스트 유저 초대

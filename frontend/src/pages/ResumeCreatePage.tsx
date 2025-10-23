@@ -81,7 +81,7 @@ const ResumeCreatePage: React.FC = () => {
       transcribeFormData.append('file', audioBlob, 'recording.webm');
       
       const transcribeResponse = await axios.post(
-        'http://localhost:8000/api/speech/transcribe',
+        'http://localhost:9000/api/speech/transcribe',
         transcribeFormData
       );
       
@@ -92,7 +92,7 @@ const ResumeCreatePage: React.FC = () => {
       extractFormData.append('text', transcript);
       
       const extractResponse = await axios.post(
-        'http://localhost:8000/api/v1/resume/extract-from-text',
+        'http://localhost:9000/api/v1/resume/extract-from-text',
         extractFormData
       );
       
@@ -137,7 +137,7 @@ const ResumeCreatePage: React.FC = () => {
       extractFormData.append('text', inputText);
       
       const extractResponse = await axios.post(
-        'http://localhost:8000/api/v1/resume/extract-from-text',
+        'http://localhost:9000/api/v1/resume/extract-from-text',
         extractFormData
       );
       
@@ -191,18 +191,154 @@ const ResumeCreatePage: React.FC = () => {
       {generatedResume && (
         <Paper elevation={3} sx={{ p: 4, mb: 4, backgroundColor: 'success.lighter' }}>
           <Typography variant="h5" gutterBottom sx={{ fontSize: '1.5rem', fontWeight: 600 }}>
-            ✅ 생성된 이력서
+            생성된 이력서
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <pre style={{ 
-              whiteSpace: 'pre-wrap', 
-              fontSize: '1.1rem',
-              lineHeight: 1.6,
-              fontFamily: 'inherit'
-            }}>
-              {JSON.stringify(generatedResume, null, 2)}
-            </pre>
+          
+          {/* 이력서 내용 */}
+          <Box sx={{ 
+            mt: 3,
+            bgcolor: 'white', 
+            p: 4, 
+            borderRadius: 2,
+            border: '2px solid #1976d2'
+          }}>
+            {/* 기본정보 */}
+            <Box sx={{ mb: 4, pb: 3, borderBottom: '2px solid #e0e0e0' }}>
+              <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold', color: '#1976d2' }}>
+                이력서
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 2 }}>
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>이름</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.기본정보?.이름 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>연락처</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.기본정보?.연락처 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>이메일</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.기본정보?.이메일 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>주소</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.기본정보?.주소 || '-'}</Typography>
+              </Box>
+            </Box>
+
+            {/* 학력정보 */}
+            <Box sx={{ mb: 4, pb: 3, borderBottom: '2px solid #e0e0e0' }}>
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+                학력
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 2 }}>
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>학교명</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.학력정보?.학교명 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>전공</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.학력정보?.전공 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>학위</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.학력정보?.학위 || '-'}</Typography>
+                
+                <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>졸업연도</Typography>
+                <Typography sx={{ fontSize: '1.1rem' }}>{generatedResume?.학력정보?.졸업연도 || '-'}</Typography>
+              </Box>
+            </Box>
+
+            {/* 경력정보 */}
+            <Box sx={{ mb: 4, pb: 3, borderBottom: '2px solid #e0e0e0' }}>
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+                경력
+              </Typography>
+              {generatedResume?.경력정보 && generatedResume.경력정보.length > 0 ? (
+                generatedResume.경력정보.map((career: any, index: number) => (
+                  <Box key={index} sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, fontSize: '1.2rem' }}>
+                      {career.회사명 || '회사명 없음'}
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 1.5, mt: 1 }}>
+                      <Typography sx={{ fontWeight: 'bold' }}>직위</Typography>
+                      <Typography>{career.직위 || '-'}</Typography>
+                      
+                      <Typography sx={{ fontWeight: 'bold' }}>재직기간</Typography>
+                      <Typography>{career.재직기간 || '-'}</Typography>
+                      
+                      <Typography sx={{ fontWeight: 'bold' }}>담당업무</Typography>
+                      <Typography>{career.담당업무 || '-'}</Typography>
+                      
+                      <Typography sx={{ fontWeight: 'bold' }}>주요성과</Typography>
+                      <Typography>{career.주요성과 || '-'}</Typography>
+                    </Box>
+                  </Box>
+                ))
+              ) : (
+                <Typography color="text.secondary">경력 정보가 없습니다.</Typography>
+              )}
+            </Box>
+
+            {/* 기술스택/자격증 */}
+            <Box sx={{ mb: 4, pb: 3, borderBottom: '2px solid #e0e0e0' }}>
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+                기술 및 자격
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography sx={{ fontWeight: 'bold', mb: 1, fontSize: '1.1rem' }}>기술스택</Typography>
+                {generatedResume?.['기술스택/자격증']?.기술스택 && generatedResume['기술스택/자격증'].기술스택.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {generatedResume['기술스택/자격증'].기술스택.map((skill: string, index: number) => (
+                      <Box key={index} sx={{ 
+                        px: 2, 
+                        py: 0.5, 
+                        bgcolor: '#e3f2fd', 
+                        borderRadius: 2,
+                        fontSize: '1rem'
+                      }}>
+                        {skill}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography color="text.secondary">등록된 기술스택이 없습니다.</Typography>
+                )}
+              </Box>
+              <Box>
+                <Typography sx={{ fontWeight: 'bold', mb: 1, fontSize: '1.1rem' }}>자격증</Typography>
+                {generatedResume?.['기술스택/자격증']?.자격증 && generatedResume['기술스택/자격증'].자격증.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {generatedResume['기술스택/자격증'].자격증.map((cert: string, index: number) => (
+                      <Box key={index} sx={{ 
+                        px: 2, 
+                        py: 0.5, 
+                        bgcolor: '#fff3e0', 
+                        borderRadius: 2,
+                        fontSize: '1rem'
+                      }}>
+                        {cert}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography color="text.secondary">등록된 자격증이 없습니다.</Typography>
+                )}
+              </Box>
+            </Box>
+
+            {/* 자기소개 */}
+            {generatedResume?.자기소개 && (
+              <Box>
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+                  자기소개
+                </Typography>
+                <Typography sx={{ 
+                  fontSize: '1.1rem', 
+                  lineHeight: 1.8,
+                  p: 2,
+                  bgcolor: '#f8f9fa',
+                  borderRadius: 1
+                }}>
+                  {generatedResume.자기소개}
+                </Typography>
+              </Box>
+            )}
           </Box>
+
           <Box sx={{ mt: 3, textAlign: 'center' }}>
             <Button
               variant="contained"
