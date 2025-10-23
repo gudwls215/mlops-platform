@@ -192,7 +192,12 @@
 
 - [ ] MVP 출시
   - [ ] 소규모 테스트 유저 초대
-  - [ ] 피드백 수집 시스템 구축
+  - [x] 피드백 수집 시스템 구축
+    - [x] Feedback 데이터베이스 모델 생성
+    - [x] Feedback API 엔드포인트 구현 (POST, GET stats, GET recent, GET by ID)
+    - [x] 프론트엔드 피드백 모달 컴포넌트 작성
+    - [x] ResumeCreatePage에 피드백 버튼 추가
+    - [x] 피드백 통계 및 분석 기능 구현
   - [ ] 사용량 모니터링 기본 설정
 
 ---

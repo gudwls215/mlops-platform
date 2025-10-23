@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import resume, job_posting, speech, cover_letter, matching
+from app.api import feedback
 from app.core.config import settings
 
 app = FastAPI(
@@ -24,6 +25,7 @@ app.include_router(job_posting.router, prefix="/api/v1/job", tags=["job"])
 app.include_router(speech.router, tags=["speech"])
 app.include_router(cover_letter.router, tags=["cover-letter"])
 app.include_router(matching.router, tags=["matching"])
+app.include_router(feedback.router, tags=["feedback"])
 
 @app.get("/")
 async def root():

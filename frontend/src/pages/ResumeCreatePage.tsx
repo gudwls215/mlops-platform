@@ -9,10 +9,12 @@ import {
   Tabs,
   Paper,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Fab
 } from '@mui/material';
-import { Mic, MicOff, Create, Save, CheckCircle } from '@mui/icons-material';
+import { Mic, MicOff, Create, Save, CheckCircle, Feedback } from '@mui/icons-material';
 import VoiceRecorder from '../components/VoiceRecorder';
+import FeedbackModal from '../components/FeedbackModal';
 import axios from 'axios';
 
 interface TabPanelProps {
@@ -57,6 +59,7 @@ const ResumeCreatePage: React.FC = () => {
   const [generatedResume, setGeneratedResume] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -510,6 +513,28 @@ const ResumeCreatePage: React.FC = () => {
           AI 이력서 생성하기
         </Button>
       </Box>
+
+      {/* 플로팅 피드백 버튼 */}
+      <Fab
+        color="primary"
+        aria-label="feedback"
+        onClick={() => setFeedbackModalOpen(true)}
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 1000
+        }}
+      >
+        <Feedback />
+      </Fab>
+
+      {/* 피드백 모달 */}
+      <FeedbackModal
+        open={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        relatedResumeId={generatedResume?.id}
+      />
     </Container>
   );
 };
