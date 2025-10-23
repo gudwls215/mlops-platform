@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from urllib.parse import quote_plus
 
 class Settings(BaseSettings):
     # 데이터베이스 설정
@@ -24,7 +25,9 @@ class Settings(BaseSettings):
     
     @property
     def database_url(self) -> str:
-        return f"postgresql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
+        # 비밀번호를 URL 인코딩하여 특수문자 처리
+        encoded_password = quote_plus(self.DATABASE_PASSWORD)
+        return f"postgresql://{self.DATABASE_USER}:{encoded_password}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
     
     class Config:
         env_file = ".env"
