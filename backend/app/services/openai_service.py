@@ -17,7 +17,7 @@ class OpenAIService:
     def __init__(self):
         """OpenAI 클라이언트 초기화"""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
         self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
         
         if not self.api_key or self.api_key == "your-openai-api-key-here":
@@ -30,10 +30,11 @@ class OpenAIService:
         self.total_completion_tokens = 0
         self.total_cost = 0.0
         
-        # GPT-4 가격 (2024년 기준, 1000 토큰당)
+        # GPT 모델 가격 (2024년 기준, 1000 토큰당)
         self.pricing = {
             "gpt-4": {"prompt": 0.03, "completion": 0.06},
             "gpt-4-turbo": {"prompt": 0.01, "completion": 0.03},
+            "gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
             "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002}
         }
         
@@ -72,7 +73,7 @@ class OpenAIService:
             예상 비용 (USD)
         """
         model = model or self.model
-        pricing = self.pricing.get(model, self.pricing["gpt-4"])
+        pricing = self.pricing.get(model, self.pricing["gpt-5-mini"])
         
         prompt_cost = (prompt_tokens / 1000) * pricing["prompt"]
         completion_cost = (completion_tokens / 1000) * pricing["completion"]
