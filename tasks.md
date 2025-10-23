@@ -198,7 +198,12 @@
     - [x] 프론트엔드 피드백 모달 컴포넌트 작성
     - [x] ResumeCreatePage에 피드백 버튼 추가
     - [x] 피드백 통계 및 분석 기능 구현
-  - [ ] 사용량 모니터링 기본 설정
+  - [x] 사용량 모니터링 기본 설정
+    - [x] UsageLog 데이터베이스 모델 생성
+    - [x] 사용량 모니터링 미들웨어 구현 (응답 시간, 에러 추적)
+    - [x] Monitoring API 엔드포인트 구현 (stats, endpoints, errors, slow-requests, recent)
+    - [x] 프론트엔드 모니터링 대시보드 작성
+    - [x] 자동 새로고침 기능 (30초)
 
 ---
 

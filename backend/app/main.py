@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import resume, job_posting, speech, cover_letter, matching
-from app.api import feedback
+from app.api import feedback, monitoring
+from app.middleware.usage_monitoring import UsageMonitoringMiddleware
 from app.core.config import settings
 
 app = FastAPI(
@@ -19,6 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 사용량 모니터링 미들웨어 추가
+app.add_middleware(UsageMonitoringMiddleware)
+
 # 라우터 등록
 app.include_router(resume.router, prefix="/api/v1/resume", tags=["resume"])
 app.include_router(job_posting.router, prefix="/api/v1/job", tags=["job"])
@@ -26,6 +30,7 @@ app.include_router(speech.router, tags=["speech"])
 app.include_router(cover_letter.router, tags=["cover-letter"])
 app.include_router(matching.router, tags=["matching"])
 app.include_router(feedback.router, tags=["feedback"])
+app.include_router(monitoring.router, tags=["monitoring"])
 
 @app.get("/")
 async def root():
