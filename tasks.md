@@ -301,10 +301,22 @@
   - [ ] 이력서-공고 매칭용 Siamese Network
   - [ ] Transformer 기반 매칭 모델
 
-- [ ] 모델 최적화
-  - [ ] 하이퍼파라미터 튜닝 (Grid Search, Random Search)
-  - [ ] 교차 검증 (Cross Validation)
-  - [ ] 앙상블 방법 적용
+- [x] 모델 최적화
+  - [x] 하이퍼파라미터 튜닝 (Grid Search, Random Search)
+    - Grid Search 완료: 로지스틱 회귀 100회, Random Forest 1,080회
+    - 로지스틱 회귀 최적 파라미터: C=10.0, penalty='l2', solver='liblinear'
+    - Random Forest 최적 파라미터: n_estimators=50, max_depth=10, min_samples_split=30
+  - [x] 교차 검증 (Cross Validation)
+    - 5-fold CV로 모델 성능 검증
+    - 로지스틱 회귀: CV F1 0.504 (±0.085)
+    - Random Forest: CV F1 0.539 (±0.159)
+  - [x] 앙상블 방법 적용
+    - Random Forest 자체가 앙상블 모델
+  - [!] 최적화 결과 분석
+    - 베이스라인 대비 성능 하락 (로지스틱 F1: 0.587 → 0.574)
+    - 과적합은 다소 개선되었으나 전반적 성능 저하
+    - 근본 원인: 데이터 부족 (611건), 고차원 임베딩 (768차원)
+    - 추가 개선 필요: 데이터 증강, 특성 선택, 앙상블 기법
 
 - [ ] 모델 평가 및 선택
   - [ ] 테스트 데이터 성능 평가
