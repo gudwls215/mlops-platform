@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage';
 import ResumeCreatePage from './pages/ResumeCreatePage';
 import CoverLetterPage from './pages/CoverLetterPage';
 import JobListPage from './pages/JobListPage';
+import LabelingPage from './pages/LabelingPage';
 
 // 장년층 친화적 테마 설정
 const theme = createTheme({
@@ -97,6 +98,7 @@ function App() {
               <Route path="/resume/create" element={<ResumeCreatePage />} />
               <Route path="/cover-letter" element={<CoverLetterPage />} />
               <Route path="/jobs" element={<JobListPage />} />
+              <Route path="/labeling" element={<LabelingPage />} />
             </Routes>
           </Box>
           <Footer />
