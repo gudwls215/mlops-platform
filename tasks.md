@@ -280,10 +280,21 @@
     - 향후 불균형 발생 시 SMOTE 또는 가중치 조정 적용 예정
 
 ### Week 11-12: 합격률 예측 모델 개발
-- [ ] 베이스라인 모델 구축
-  - [ ] 간단한 로지스틱 회귀 모델
-  - [ ] Random Forest 모델
-  - [ ] 기본 성능 지표 측정 (Accuracy, F1, ROC-AUC)
+- [x] 베이스라인 모델 구축
+  - [x] 로지스틱 회귀 모델
+    - Train: Accuracy 0.959, F1 0.959, ROC-AUC 0.995
+    - Validation: Accuracy 0.533, F1 0.544, ROC-AUC 0.527
+    - Test: Accuracy 0.577, F1 0.587, ROC-AUC 0.569
+  - [x] Random Forest 모델
+    - Train: Accuracy 0.970, F1 0.970, ROC-AUC 0.998
+    - Validation: Accuracy 0.475, F1 0.467, ROC-AUC 0.505
+    - Test: Accuracy 0.431, F1 0.417, ROC-AUC 0.445
+  - [x] 기본 성능 지표 측정 (Accuracy, F1, ROC-AUC)
+  - [x] 모델 저장 (joblib 형식)
+  - [x] 최고 성능: 로지스틱 회귀 (Test F1 0.587)
+  - [!] 과적합 문제 발견 (Train 96%, Test 58%)
+    - Train/Test 성능 차이가 큼
+    - 정규화 및 하이퍼파라미터 튜닝 필요
 
 - [ ] 딥러닝 모델 실험
   - [ ] BERT 기반 분류 모델
