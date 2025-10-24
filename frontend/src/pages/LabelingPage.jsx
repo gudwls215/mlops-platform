@@ -23,8 +23,7 @@ import {
   SkipNext
 } from '@mui/icons-material';
 import axios from 'axios';
-
-const API_BASE_URL = 'http://192.168.0.147:9000';
+import { API_BASE_URL } from '../types';
 
 function LabelingPage() {
   const [currentItem, setCurrentItem] = useState(null);

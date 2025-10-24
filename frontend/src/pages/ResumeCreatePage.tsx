@@ -16,6 +16,7 @@ import { Mic, MicOff, Create, Save, CheckCircle, Feedback } from '@mui/icons-mat
 import VoiceRecorder from '../components/VoiceRecorder';
 import FeedbackModal from '../components/FeedbackModal';
 import axios from 'axios';
+import { API_BASE_URL } from '../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -84,7 +85,7 @@ const ResumeCreatePage: React.FC = () => {
       transcribeFormData.append('file', audioBlob, 'recording.webm');
       
       const transcribeResponse = await axios.post(
-        'http://localhost:9000/api/speech/transcribe',
+        `${API_BASE_URL}/api/speech/transcribe`,
         transcribeFormData
       );
       
@@ -95,7 +96,7 @@ const ResumeCreatePage: React.FC = () => {
       extractFormData.append('text', transcript);
       
       const extractResponse = await axios.post(
-        'http://localhost:9000/api/v1/resume/extract-from-text',
+        `${API_BASE_URL}/api/v1/resume/extract-from-text`,
         extractFormData
       );
       
@@ -140,7 +141,7 @@ const ResumeCreatePage: React.FC = () => {
       extractFormData.append('text', inputText);
       
       const extractResponse = await axios.post(
-        'http://localhost:9000/api/v1/resume/extract-from-text',
+        `${API_BASE_URL}/api/v1/resume/extract-from-text`,
         extractFormData
       );
       

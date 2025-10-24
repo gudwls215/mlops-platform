@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { Work, LocationOn, AttachMoney, Schedule, Search } from '@mui/icons-material';
 import axios from 'axios';
+import { API_BASE_URL } from '../types';
 
 // 임시 채용공고 데이터
 const sampleJobs = [
@@ -85,7 +86,7 @@ const JobListPage: React.FC = () => {
     try {
       const skip = (page - 1) * itemsPerPage;
       const response = await axios.get(
-        `http://localhost:9000/api/v1/job/?skip=${skip}&limit=${itemsPerPage}`
+        `${API_BASE_URL}/api/v1/job/?skip=${skip}&limit=${itemsPerPage}`
       );
       
       if (response.data.status === 'success') {
@@ -118,7 +119,7 @@ const JobListPage: React.FC = () => {
       formData.append('limit', itemsPerPage.toString());
       
       const response = await axios.post(
-        'http://localhost:9000/api/v1/job/search',
+        `${API_BASE_URL}/api/v1/job/search`,
         formData
       );
       
