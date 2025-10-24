@@ -30,20 +30,19 @@ class SaraminCrawler(RequestsCrawler):
         from database import DatabaseManager
         self.db_manager = DatabaseManager()
     
-    def get_job_urls(self, category: str = None, page_limit: int = 5) -> List[str]:
-        """채용공고 URL 목록 가져오기 (개선: 랜덤 페이지 시작, 키워드 로테이션)"""
+    def get_job_urls(self, category: str = None, page_limit: int = 20) -> List[str]:
+        """채용공고 URL 목록 가져오기 (전체 채용공고 수집)"""
         job_urls = []
         
-        # 키워드 랜덤 셔플 (매번 다른 키워드 순서)
+        # 키워드 없이 전체 채용공고 검색 (다양한 직무 카테고리)
         import random
-        shuffled_keywords = SENIOR_KEYWORDS.copy()
-        random.shuffle(shuffled_keywords)
+        categories = ['경력직', '신입', '정규직', '계약직', '인턴', '기술직', '사무직', '영업직', '서비스직']
         
-        # 시니어 관련 키워드로 검색 (상위 3개)
-        for keyword in shuffled_keywords[:3]:
+        # 다양한 카테고리로 검색
+        for keyword in categories:
             try:
-                # 랜덤 시작 페이지 (1~3 중 선택)
-                start_page = random.randint(1, 3)
+                # 페이지 범위 확대 (1페이지부터 20페이지까지)
+                start_page = 1
                 
                 for page in range(start_page, start_page + page_limit):
                     # 날짜 정렬 추가 (최신순)
@@ -78,7 +77,7 @@ class SaraminCrawler(RequestsCrawler):
                     self.logger.info(f"키워드 '{keyword}' 페이지 {page}에서 {len(job_links)}개 링크 수집 (누적: {len(job_urls)}개)")
                     
                     # 충분한 URL을 수집했으면 중단
-                    if len(job_urls) >= 150:
+                    if len(job_urls) >= 500:
                         self.logger.info(f"목표 URL 개수 도달 ({len(job_urls)}개), 수집 중단")
                         break
                     
@@ -87,7 +86,7 @@ class SaraminCrawler(RequestsCrawler):
                 continue
             
             # 키워드당 충분한 URL 수집 시 중단
-            if len(job_urls) >= 150:
+            if len(job_urls) >= 500:
                 break
         
         self.logger.info(f"총 {len(job_urls)}개 고유 채용공고 URL 수집 완료 (중복 제거됨)")
@@ -289,14 +288,7 @@ class SaraminCrawler(RequestsCrawler):
             tag_elems = soup.find_all('span', class_='tag')
             job_data['tags'] = [JobCrawlerUtils.clean_text(tag.get_text()) for tag in tag_elems]
             
-            # 시니어 친화적인지 확인
-            is_senior_friendly = JobCrawlerUtils.is_senior_friendly(job_data)
-            if not is_senior_friendly:
-                self.logger.warning(f"시니어 친화적이지 않은 공고: {job_data['title']} - {job_data['company']}")
-                return None
-            else:
-                self.logger.info(f"시니어 친화적 공고 발견: {job_data['title']} - {job_data['company']}")
-            
+            # 시니어 필터 제거 - 모든 채용공고 수집
             self.logger.info(f"채용공고 파싱 완료: {job_data['title']} - {job_data['company']}")
             return job_data
             
