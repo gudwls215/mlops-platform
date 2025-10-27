@@ -104,3 +104,6 @@ mlartifacts/
 airflow.cfg
 logs/
 dags/__pycache__/
+
+# reports
+backend/reports/
