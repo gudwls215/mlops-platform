@@ -31,6 +31,13 @@ try:
 except ImportError:
     from scripts.collaborative_filtering import CollaborativeFilteringRecommender
 
+# diversity_novelty 모듈 임포트
+try:
+    from diversity_novelty import DiversityNoveltyReranker, parse_embedding
+except ImportError:
+    from scripts.diversity_novelty import DiversityNoveltyReranker, parse_embedding as dn_parse_embedding
+    parse_embedding = dn_parse_embedding
+
 router = APIRouter(prefix="/api/hybrid-recommendations", tags=["hybrid-recommendations"])
 
 # 데이터베이스 연결 설정
@@ -52,6 +59,7 @@ FINAL_MODEL_PATH = MODEL_DIR / 'final_model.joblib'
 # 싱글톤 인스턴스
 _model = None
 _cf_recommender = None
+_diversity_reranker = None
 
 
 def load_model():
@@ -74,6 +82,14 @@ def get_cf_recommender():
             _cf_recommender = None
             raise ValueError("협업 필터링 모델 빌드 실패")
     return _cf_recommender
+
+
+def get_diversity_reranker():
+    """다양성/참신성 재정렬 시스템 로드 (싱글톤)"""
+    global _diversity_reranker
+    if _diversity_reranker is None:
+        _diversity_reranker = DiversityNoveltyReranker()
+    return _diversity_reranker
 
 
 def parse_embedding(embedding_str: str) -> np.ndarray:
@@ -217,7 +233,11 @@ def hybrid_recommend(
     top_n: int = 10,
     content_weight: float = 0.6,
     cf_weight: float = 0.4,
-    strategy: Literal["weighted", "cascade", "mixed"] = "weighted"
+    strategy: Literal["weighted", "cascade", "mixed"] = "weighted",
+    enable_diversity: bool = False,
+    diversity_weight: float = 0.3,
+    novelty_weight: float = 0.2,
+    mmr_lambda: float = 0.7
 ) -> List[dict]:
     """
     하이브리드 추천
@@ -231,9 +251,13 @@ def hybrid_recommend(
             - weighted: 가중치 합산
             - cascade: Content-based 우선, 부족하면 CF 추가
             - mixed: 번갈아가며 섞기
+        enable_diversity: 다양성/참신성 재정렬 활성화
+        diversity_weight: 다양성 가중치 (enable_diversity=True일 때)
+        novelty_weight: 참신성 가중치 (enable_diversity=True일 때)
+        mmr_lambda: MMR 알고리즘 lambda 파라미터 (enable_diversity=True일 때)
     
     Returns:
-        [{"job_id", "score", "similarity", "cf_score", "success_probability", ...}, ...]
+        [{"job_id", "score", "similarity", "cf_score", ...}, ...]
     """
     # Content-based 추천
     cb_recommendations = get_content_based_recommendations(resume_id, top_n=top_n*2)
@@ -243,18 +267,74 @@ def hybrid_recommend(
     
     if strategy == "weighted":
         # 가중치 합산 전략
-        return _weighted_hybrid(cb_recommendations, cf_recommendations, top_n, content_weight, cf_weight)
+        results = _weighted_hybrid(cb_recommendations, cf_recommendations, top_n, content_weight, cf_weight)
     
     elif strategy == "cascade":
         # Cascade 전략: Content-based 우선, 부족하면 CF로 채움
-        return _cascade_hybrid(cb_recommendations, cf_recommendations, top_n)
+        results = _cascade_hybrid(cb_recommendations, cf_recommendations, top_n)
     
     elif strategy == "mixed":
         # Mixed 전략: 번갈아가며 섞기
-        return _mixed_hybrid(cb_recommendations, cf_recommendations, top_n)
+        results = _mixed_hybrid(cb_recommendations, cf_recommendations, top_n)
     
     else:
         raise ValueError(f"지원하지 않는 전략: {strategy}")
+    
+    # 다양성/참신성 재정렬
+    if enable_diversity and results:
+        try:
+            # 이력서 임베딩 조회
+            engine = create_engine(DATABASE_URL)
+            resume_query = f"""
+            SELECT id, embedding_array
+            FROM {DB_SCHEMA}.cover_letter_samples
+            WHERE id = :resume_id
+            """
+            
+            with engine.connect() as conn:
+                resume_result = conn.execute(text(resume_query), {"resume_id": resume_id}).fetchone()
+            
+            if resume_result:
+                resume_embedding = parse_embedding(resume_result[1])
+                
+                # 채용공고 임베딩 조회
+                job_ids = [rec['job_id'] for rec in results]
+                jobs_query = f"""
+                SELECT id, embedding_array
+                FROM {DB_SCHEMA}.job_postings
+                WHERE id = ANY(:job_ids) AND embedding_array IS NOT NULL
+                """
+                
+                with engine.connect() as conn:
+                    jobs_df = pd.read_sql(text(jobs_query), conn, params={"job_ids": job_ids})
+                
+                job_embeddings = {}
+                for _, row in jobs_df.iterrows():
+                    emb = parse_embedding(row['embedding_array'])
+                    if emb is not None:
+                        job_embeddings[row['id']] = emb
+                
+                # 다양성/참신성 재정렬
+                reranker = get_diversity_reranker()
+                
+                # 연관성 가중치 조정 (나머지 가중치)
+                relevance_weight = 1.0 - diversity_weight - novelty_weight
+                
+                results = reranker.hybrid_rerank(
+                    recommendations=results,
+                    resume_embedding=resume_embedding,
+                    job_embeddings=job_embeddings,
+                    user_id=resume_id,
+                    diversity_weight=diversity_weight,
+                    novelty_weight=novelty_weight,
+                    relevance_weight=relevance_weight,
+                    mmr_lambda=mmr_lambda,
+                    top_n=top_n
+                )
+        except Exception as e:
+            print(f"다양성/참신성 재정렬 실패 (기본 추천 반환): {e}")
+    
+    return results
 
 
 def _weighted_hybrid(
@@ -400,6 +480,12 @@ class HybridRecommendationResponse(BaseModel):
     cf_score: Optional[float] = None
     strategy: str
     source: Optional[str] = None
+    # 다양성/참신성 관련 필드
+    final_score: Optional[float] = None
+    diversity_score: Optional[float] = None
+    novelty_score: Optional[float] = None
+    user_novelty: Optional[float] = None
+    recency_factor: Optional[float] = None
 
 
 class HybridRecommendationsListResponse(BaseModel):
@@ -419,10 +505,14 @@ async def get_hybrid_recommendations(
     top_n: int = Query(10, ge=1, le=50, description="추천 개수"),
     strategy: Literal["weighted", "cascade", "mixed"] = Query("weighted", description="통합 전략"),
     content_weight: float = Query(0.6, ge=0, le=1, description="Content-based 가중치"),
-    cf_weight: float = Query(0.4, ge=0, le=1, description="Collaborative Filtering 가중치")
+    cf_weight: float = Query(0.4, ge=0, le=1, description="Collaborative Filtering 가중치"),
+    enable_diversity: bool = Query(False, description="다양성/참신성 재정렬 활성화"),
+    diversity_weight: float = Query(0.3, ge=0, le=1, description="다양성 가중치"),
+    novelty_weight: float = Query(0.2, ge=0, le=1, description="참신성 가중치"),
+    mmr_lambda: float = Query(0.7, ge=0, le=1, description="MMR lambda (유사도 vs 다양성)")
 ):
     """
-    하이브리드 채용공고 추천 (Content-based + Collaborative Filtering)
+    하이브리드 채용공고 추천 (Content-based + Collaborative Filtering + Diversity/Novelty)
     
     - **resume_id**: 이력서 ID
     - **top_n**: 추천 개수 (기본값: 10)
@@ -432,6 +522,10 @@ async def get_hybrid_recommendations(
         - `mixed`: 번갈아가며 섞기
     - **content_weight**: Content-based 가중치 (weighted 전략용, 기본값: 0.6)
     - **cf_weight**: Collaborative Filtering 가중치 (weighted 전략용, 기본값: 0.4)
+    - **enable_diversity**: 다양성/참신성 재정렬 활성화 (기본값: False)
+    - **diversity_weight**: 다양성 가중치 (기본값: 0.3)
+    - **novelty_weight**: 참신성 가중치 (기본값: 0.2)
+    - **mmr_lambda**: MMR 알고리즘 lambda 파라미터 (기본값: 0.7, 1에 가까울수록 유사도 중시)
     """
     try:
         recommendations = hybrid_recommend(
@@ -439,7 +533,11 @@ async def get_hybrid_recommendations(
             top_n=top_n,
             content_weight=content_weight,
             cf_weight=cf_weight,
-            strategy=strategy
+            strategy=strategy,
+            enable_diversity=enable_diversity,
+            diversity_weight=diversity_weight,
+            novelty_weight=novelty_weight,
+            mmr_lambda=mmr_lambda
         )
         
         if not recommendations:

@@ -376,7 +376,13 @@
     - 가중치 민감도 분석 (Content vs CF 비율)
     - 성능 테스트: P95 응답 시간 0.361초 (목표 < 2초 달성)
     - 추천 중복도 분석 (전략 간 100% 중복, Content-based 우세)
-  - [ ] 추천 다양성 및 참신성 고려
+  - [x] 추천 다양성 및 참신성 고려
+    - MMR (Maximal Marginal Relevance) 알고리즘 구현
+    - 참신성(Novelty) 메트릭 구현 (사용자 기록 + 등록일 기반)
+    - 하이브리드 재정렬 시스템 (diversity + novelty + relevance)
+    - API 파라미터 추가: enable_diversity, diversity_weight, novelty_weight, mmr_lambda
+    - 성능 테스트: 오버헤드 42.3% (허용 범위 < 50%)
+    - 다양성 개선: 15.6% (0.179 → 0.207)
 
 - [ ] 직무 추천 모델
   - [ ] 경력 분석 알고리즘
