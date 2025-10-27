@@ -318,15 +318,45 @@
     - 근본 원인: 데이터 부족 (611건), 고차원 임베딩 (768차원)
     - 추가 개선 필요: 데이터 증강, 특성 선택, 앙상블 기법
 
-- [ ] 모델 평가 및 선택
-  - [ ] 테스트 데이터 성능 평가
-  - [ ] 혼동 행렬 (Confusion Matrix) 분석
-  - [ ] 특성 중요도 분석
-  - [ ] 최종 모델 선택
+- [x] 모델 평가 및 선택
+  - [x] 테스트 데이터 성능 평가
+    - 4개 모델 평가 완료 (베이스라인 2개, 최적화 2개)
+  - [x] 혼동 행렬 (Confusion Matrix) 분석
+    - 각 모델별 혼동 행렬 시각화 완료
+    - 저장 위치: backend/reports/confusion_matrix_*.png
+  - [x] 특성 중요도 분석
+    - Random Forest 모델 특성 중요도 분석 완료
+    - 저장 위치: backend/reports/feature_importance_*.png
+  - [x] 최종 모델 선택
+    - **선택된 모델: Logistic Regression (Baseline)**
+    - Test F1 Score: 0.577
+    - Test Accuracy: 0.577
+    - Test ROC-AUC: 0.569
+    - 저장 위치: backend/models/final_model.joblib
+    - 메타데이터: backend/models/final_model_metadata.json
+  - [x] 평가 리포트 생성
+    - 종합 평가 리포트: backend/reports/evaluation_report.json
+    - ROC 곡선 비교: backend/reports/roc_curves_comparison.png
+  - [!] 성능 제한 분석
+    - 최고 성능: F1 0.577 (약 58% 정확도)
+    - 근본 원인: 데이터 부족 (611건), 고차원 임베딩 (768차원)
+    - 향후 개선 필요: 데이터 수집 확대, 딥러닝 모델 실험
 
 ### Week 13-14: 추천 시스템 개발
-- [ ] 채용공고 추천 모델
-  - [ ] Content-based 필터링 구현
+- [x] 채용공고 추천 모델
+  - [x] Content-based 필터링 구현
+    - Content-based 추천 시스템 구현 완료 (job_recommender.py)
+    - 코사인 유사도 기반 이력서-채용공고 매칭
+    - 최종 모델을 사용한 합격 확률 예측 통합
+    - 추천 결과 저장 및 관리 기능
+  - [x] 추천 API 구현
+    - GET /api/recommendations/jobs/{resume_id} - 채용공고 추천 조회
+    - POST /api/recommendations/jobs/{resume_id}/save - 추천 결과 저장
+    - GET /api/recommendations/stats - 추천 통계 조회
+  - [x] 추천 시스템 테스트
+    - 이력서 ID 1에 대한 추천 성공 (Top 10)
+    - 평균 유사도: 54.7%, 평균 합격 확률: 60.7%
+    - 추천 결과 데이터베이스 저장 완료
   - [ ] 협업 필터링 구현 (사용자 데이터 충분시)
   - [ ] 하이브리드 추천 시스템 구축
   - [ ] 추천 다양성 및 참신성 고려

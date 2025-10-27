@@ -5,11 +5,11 @@ from app.api import feedback, monitoring
 from app.middleware.usage_monitoring import UsageMonitoringMiddleware
 from app.core.config import settings
 
-# routers 패키지에서 labeling 임포트
+# routers 패키지에서 labeling, recommendations 임포트
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from routers import labeling
+from routers import labeling, recommendations
 
 app = FastAPI(
     title="장년층 이력서 생성 도우미 API",
@@ -38,6 +38,7 @@ app.include_router(matching.router, tags=["matching"])
 app.include_router(feedback.router, tags=["feedback"])
 app.include_router(monitoring.router, tags=["monitoring"])
 app.include_router(labeling.router, tags=["labeling"])
+app.include_router(recommendations.router, tags=["recommendations"])
 
 @app.get("/")
 async def root():
