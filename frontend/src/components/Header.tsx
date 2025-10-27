@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { Description, Work, Create } from '@mui/icons-material';
+import { Description, Work, Create, Recommend } from '@mui/icons-material';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -48,6 +48,14 @@ const Header: React.FC = () => {
             sx={{ fontSize: '1rem', px: 2 }}
           >
             채용정보
+          </Button>
+          <Button
+            color="inherit"
+            startIcon={<Recommend />}
+            onClick={() => navigate('/recommendations')}
+            sx={{ fontSize: '1rem', px: 2 }}
+          >
+            AI 추천
           </Button>
         </Box>
       </Toolbar>

@@ -9,7 +9,7 @@ import pandas as pd
 from typing import Dict, List
 import numpy as np
 
-BASE_URL = "http://localhost:9000"
+BASE_URL = "http://192.168.0.147:9000"
 
 
 def test_api_availability():
