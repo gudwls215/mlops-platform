@@ -30,18 +30,19 @@ class SaraminCrawler(RequestsCrawler):
         from database import DatabaseManager
         self.db_manager = DatabaseManager()
     
-    def get_job_urls(self, category: str = None, page_limit: int = 20) -> List[str]:
+    def get_job_urls(self, category: str = None, page_limit: int = 30) -> List[str]:
         """채용공고 URL 목록 가져오기 (전체 채용공고 수집)"""
         job_urls = []
         
         # 키워드 없이 전체 채용공고 검색 (다양한 직무 카테고리)
         import random
-        categories = ['경력직', '신입', '정규직', '계약직', '인턴', '기술직', '사무직', '영업직', '서비스직']
+        categories = ['경력직', '신입', '정규직', '계약직', '인턴', '기술직', '사무직', '영업직', '서비스직', 
+                     '개발', '마케팅', '디자인', '기획', '생산', '물류', '품질', '연구', '재무', '인사']
         
         # 다양한 카테고리로 검색
         for keyword in categories:
             try:
-                # 페이지 범위 확대 (1페이지부터 20페이지까지)
+                # 페이지 범위 확대 (1페이지부터 30페이지까지)
                 start_page = 1
                 
                 for page in range(start_page, start_page + page_limit):
@@ -77,7 +78,7 @@ class SaraminCrawler(RequestsCrawler):
                     self.logger.info(f"키워드 '{keyword}' 페이지 {page}에서 {len(job_links)}개 링크 수집 (누적: {len(job_urls)}개)")
                     
                     # 충분한 URL을 수집했으면 중단
-                    if len(job_urls) >= 500:
+                    if len(job_urls) >= 600:
                         self.logger.info(f"목표 URL 개수 도달 ({len(job_urls)}개), 수집 중단")
                         break
                     
@@ -86,7 +87,7 @@ class SaraminCrawler(RequestsCrawler):
                 continue
             
             # 키워드당 충분한 URL 수집 시 중단
-            if len(job_urls) >= 500:
+            if len(job_urls) >= 600:
                 break
         
         self.logger.info(f"총 {len(job_urls)}개 고유 채용공고 URL 수집 완료 (중복 제거됨)")
@@ -296,7 +297,7 @@ class SaraminCrawler(RequestsCrawler):
             self.logger.error(f"채용공고 파싱 중 오류: {e}")
             return None
     
-    def crawl_jobs(self, max_jobs: int = 100, save_to_db: bool = True) -> List[Dict]:
+    def crawl_jobs(self, max_jobs: int = 500, save_to_db: bool = True) -> List[Dict]:
         """채용공고 크롤링 실행"""
         self.logger.info(f"사람인 채용공고 크롤링 시작 (최대 {max_jobs}개, DB 저장: {save_to_db})")
         

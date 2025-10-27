@@ -63,8 +63,8 @@ def run_saramin_crawler_only():
         logging.info("=== Saramin 크롤러 단독 테스트 시작 ===")
         crawler = SaraminCrawler()
         
-        # 크롤러 실행 (실시간 DB 저장 방식)
-        result = crawler.crawl_jobs(max_jobs=20, save_to_db=True)
+        # 크롤러 실행 (실시간 DB 저장 방식, 500개 수집)
+        result = crawler.crawl_jobs(max_jobs=500, save_to_db=True)
         
         if result and len(result) > 0:
             logging.info(f"✅ Saramin 크롤러 단독 테스트 완료: {len(result)}개 채용공고 수집 및 저장")
