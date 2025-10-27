@@ -357,8 +357,25 @@
     - 이력서 ID 1에 대한 추천 성공 (Top 10)
     - 평균 유사도: 54.7%, 평균 합격 확률: 60.7%
     - 추천 결과 데이터베이스 저장 완료
-  - [ ] 협업 필터링 구현 (사용자 데이터 충분시)
-  - [ ] 하이브리드 추천 시스템 구축
+  - [x] 협업 필터링 구현
+    - Item-based Collaborative Filtering 구현 완료 (collaborative_filtering.py)
+    - user_interactions 테이블 생성 (view, click, save, like, apply 상호작용)
+    - 사용자-아이템 매트릭스 구축 (100 users x 41 items, Sparsity 0.8832)
+    - 코사인 유사도 기반 아이템 간 유사도 계산
+    - 예측 평점 기반 추천 생성
+    - 샘플 상호작용 데이터 491건 생성
+  - [x] 하이브리드 추천 시스템 구축
+    - Content-based + Collaborative Filtering 통합 (hybrid_recommendations.py)
+    - 3가지 통합 전략 구현: weighted, cascade, mixed
+    - 가중치 조정 가능 (content_weight, cf_weight)
+    - GET /api/hybrid-recommendations/jobs/{resume_id} - 하이브리드 추천 조회
+    - GET /api/hybrid-recommendations/stats - 하이브리드 시스템 통계
+  - [x] 하이브리드 추천 시스템 테스트
+    - 종합 테스트 스크립트 작성 (test_hybrid_recommendations.py)
+    - 전략별 추천 결과 비교 (weighted, cascade, mixed)
+    - 가중치 민감도 분석 (Content vs CF 비율)
+    - 성능 테스트: P95 응답 시간 0.361초 (목표 < 2초 달성)
+    - 추천 중복도 분석 (전략 간 100% 중복, Content-based 우세)
   - [ ] 추천 다양성 및 참신성 고려
 
 - [ ] 직무 추천 모델
