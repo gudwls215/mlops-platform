@@ -4,6 +4,9 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
 
+// Context
+import { AppProvider } from './contexts/AppContext';
+
 // Components
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -75,38 +78,40 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            minHeight: '100vh' 
-          }}
-        >
-          <Header />
+    <AppProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
           <Box 
-            component="main" 
             sx={{ 
-              flexGrow: 1, 
-              py: 3,
-              px: { xs: 2, sm: 3 }
+              display: 'flex', 
+              flexDirection: 'column', 
+              minHeight: '100vh' 
             }}
           >
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/resume/create" element={<ResumeCreatePage />} />
-              <Route path="/cover-letter" element={<CoverLetterPage />} />
-              <Route path="/jobs" element={<JobListPage />} />
-              <Route path="/labeling" element={<LabelingPage />} />
-              <Route path="/recommendations" element={<HybridRecommendationPage />} />
-            </Routes>
+            <Header />
+            <Box 
+              component="main" 
+              sx={{ 
+                flexGrow: 1, 
+                py: 3,
+                px: { xs: 2, sm: 3 }
+              }}
+            >
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/resume/create" element={<ResumeCreatePage />} />
+                <Route path="/cover-letter" element={<CoverLetterPage />} />
+                <Route path="/jobs" element={<JobListPage />} />
+                <Route path="/labeling" element={<LabelingPage />} />
+                <Route path="/recommendations" element={<HybridRecommendationPage />} />
+              </Routes>
+            </Box>
+            <Footer />
           </Box>
-          <Footer />
-        </Box>
-      </Router>
-    </ThemeProvider>
+        </Router>
+      </ThemeProvider>
+    </AppProvider>
   );
 }
 

@@ -26,6 +26,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
+import { useAppContext } from '../contexts/AppContext';
 
 interface Recommendation {
   job_id: number;
@@ -62,6 +63,7 @@ interface Resume {
 
 const HybridRecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const { currentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep } = useAppContext();
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [resumeList, setResumeList] = useState<Resume[]>([]);
   const [topN, setTopN] = useState<number>(10);
@@ -115,15 +117,23 @@ const HybridRecommendationPage: React.FC = () => {
       const id = parseInt(resumeIdParam, 10);
       if (!isNaN(id)) {
         setResumeId(id);
+        setCurrentStep(2); // 추천 단계
         // resumeId가 설정되면 자동으로 추천 가져오기
         const fetchData = async () => {
           await fetchRecommendationsWithId(id);
         };
         fetchData();
       }
+    } else if (currentResume) {
+      // Context에서 이력서 정보 가져오기
+      setResumeId(currentResume.id);
+      const fetchData = async () => {
+        await fetchRecommendationsWithId(currentResume.id);
+      };
+      fetchData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, currentResume]);
 
   // 가중치 자동 조정
   useEffect(() => {
@@ -218,7 +228,23 @@ const HybridRecommendationPage: React.FC = () => {
         formData
       );
 
-      setGeneratedCoverLetter(coverLetterResponse.data.content || coverLetterResponse.data.data?.content || '자기소개서 생성 완료');
+      const coverLetterContent = coverLetterResponse.data.content || coverLetterResponse.data.data?.content || '자기소개서 생성 완료';
+      setGeneratedCoverLetter(coverLetterContent);
+      
+      // Context에 자기소개서와 선택된 채용공고 저장
+      setContextGeneratedCoverLetter(coverLetterContent);
+      setContextSelectedJob({
+        id: job.job_id,
+        title: job.title,
+        company: job.company,
+        description: jobResponse.data.data?.description || '',
+        requirements: jobResponse.data.data?.requirements || '',
+        location: jobResponse.data.data?.location,
+        employment_type: jobResponse.data.data?.employment_type,
+        experience_level: jobResponse.data.data?.experience_level,
+      });
+      setCurrentStep(3); // 자기소개서 생성 완료
+      
     } catch (err: any) {
       console.error('자기소개서 생성 오류:', err);
       setError(err.response?.data?.error || err.response?.data?.detail || '자기소개서 생성 중 오류가 발생했습니다.');

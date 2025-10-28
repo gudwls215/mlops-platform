@@ -18,6 +18,7 @@ import FeedbackModal from '../components/FeedbackModal';
 import axios from 'axios';
 import { API_BASE_URL } from '../types';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../contexts/AppContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -47,6 +48,7 @@ function TabPanel(props: TabPanelProps) {
 
 const ResumeCreatePage: React.FC = () => {
   const navigate = useNavigate();
+  const { setCurrentResume, setCurrentStep } = useAppContext();
   const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
@@ -195,6 +197,17 @@ const ResumeCreatePage: React.FC = () => {
       setSavedResumeId(resumeId);
       setSuccessMessage('이력서가 데이터베이스에 저장되었습니다!');
       
+      // Context에 이력서 정보 저장
+      setCurrentResume({
+        id: resumeId,
+        title: resumeTitle,
+        content: JSON.stringify(generatedResume),
+        skills: skills,
+        created_at: saveResponse.data.data.created_at,
+        updated_at: saveResponse.data.data.updated_at || saveResponse.data.data.created_at,
+      });
+      setCurrentStep(1); // 이력서 생성 완료
+      
     } catch (err: any) {
       console.error('이력서 저장 오류:', err);
       setError(err.response?.data?.error || '이력서 저장 중 오류가 발생했습니다.');
@@ -205,6 +218,7 @@ const ResumeCreatePage: React.FC = () => {
 
   const handleGoToRecommendations = () => {
     if (savedResumeId) {
+      setCurrentStep(2); // 추천 단계로 이동
       navigate(`/recommendations?resumeId=${savedResumeId}`);
     } else {
       setError('먼저 이력서를 저장해주세요.');
