@@ -27,6 +27,7 @@ import {
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
+import FlowStepIndicator from '../components/FlowStepIndicator';
 
 interface Recommendation {
   job_id: number;
@@ -63,7 +64,7 @@ interface Resume {
 
 const HybridRecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { currentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep } = useAppContext();
+  const { currentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep, currentStep } = useAppContext();
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [resumeList, setResumeList] = useState<Resume[]>([]);
   const [topN, setTopN] = useState<number>(10);
@@ -301,6 +302,8 @@ const HybridRecommendationPage: React.FC = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
+      <FlowStepIndicator currentStep={currentStep} />
+      
       <Typography variant="h4" gutterBottom fontWeight="bold">
         AI 채용공고 추천
       </Typography>

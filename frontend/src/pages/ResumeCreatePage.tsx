@@ -15,6 +15,7 @@ import {
 import { Mic, Create, Save, CheckCircle, Feedback, ArrowForward } from '@mui/icons-material';
 import VoiceRecorder from '../components/VoiceRecorder';
 import FeedbackModal from '../components/FeedbackModal';
+import FlowStepIndicator from '../components/FlowStepIndicator';
 import axios from 'axios';
 import { API_BASE_URL } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -48,7 +49,7 @@ function TabPanel(props: TabPanelProps) {
 
 const ResumeCreatePage: React.FC = () => {
   const navigate = useNavigate();
-  const { setCurrentResume, setCurrentStep } = useAppContext();
+  const { setCurrentResume, setCurrentStep, currentStep } = useAppContext();
   const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
@@ -227,6 +228,8 @@ const ResumeCreatePage: React.FC = () => {
 
   return (
     <Container maxWidth="md">
+      <FlowStepIndicator currentStep={currentStep} />
+      
       <Typography 
         variant="h3" 
         component="h1" 
