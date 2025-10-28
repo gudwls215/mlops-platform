@@ -12,11 +12,12 @@ import {
   CircularProgress,
   Fab
 } from '@mui/material';
-import { Mic, MicOff, Create, Save, CheckCircle, Feedback } from '@mui/icons-material';
+import { Mic, Create, Save, CheckCircle, Feedback, ArrowForward } from '@mui/icons-material';
 import VoiceRecorder from '../components/VoiceRecorder';
 import FeedbackModal from '../components/FeedbackModal';
 import axios from 'axios';
 import { API_BASE_URL } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -45,6 +46,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const ResumeCreatePage: React.FC = () => {
+  const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
@@ -57,7 +59,9 @@ const ResumeCreatePage: React.FC = () => {
     experience: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [generatedResume, setGeneratedResume] = useState<any>(null);
+  const [savedResumeId, setSavedResumeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
@@ -156,6 +160,57 @@ const ResumeCreatePage: React.FC = () => {
     }
   };
 
+  const handleSaveToDatabase = async () => {
+    if (!generatedResume) {
+      setError('저장할 이력서가 없습니다.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      // 이력서 제목 생성 (시간 포함)
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const resumeTitle = `${generatedResume?.기본정보?.이름 || '이름없음'}의 이력서 - ${dateStr} ${timeStr}`;
+      
+      // 기술스택 배열 생성
+      const skills = generatedResume?.['기술스택/자격증']?.기술스택 || [];
+      
+      // FormData 생성 (experience와 education 필드 제거)
+      const saveFormData = new FormData();
+      saveFormData.append('title', resumeTitle);
+      saveFormData.append('content', JSON.stringify(generatedResume));
+      saveFormData.append('skills', JSON.stringify(skills));
+      
+      // 이력서 저장 API 호출
+      const saveResponse = await axios.post(
+        `${API_BASE_URL}/api/v1/resume/`,
+        saveFormData
+      );
+
+      const resumeId = saveResponse.data.data.id;
+      setSavedResumeId(resumeId);
+      setSuccessMessage('이력서가 데이터베이스에 저장되었습니다!');
+      
+    } catch (err: any) {
+      console.error('이력서 저장 오류:', err);
+      setError(err.response?.data?.error || '이력서 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleGoToRecommendations = () => {
+    if (savedResumeId) {
+      navigate(`/recommendations?resumeId=${savedResumeId}`);
+    } else {
+      setError('먼저 이력서를 저장해주세요.');
+    }
+  };
+
   return (
     <Container maxWidth="md">
       <Typography 
@@ -183,17 +238,25 @@ const ResumeCreatePage: React.FC = () => {
         </Alert>
       )}
 
-      {isGenerating && (
-        <Box sx={{ textAlign: 'center', mb: 3, p: 3 }}>
-          <CircularProgress size={60} />
-          <Typography variant="h6" sx={{ mt: 2, fontSize: '1.2rem' }}>
-            AI가 이력서를 생성하고 있습니다...
-          </Typography>
-        </Box>
-      )}
-
       {generatedResume && (
         <Paper elevation={3} sx={{ p: 4, mb: 4, backgroundColor: 'success.lighter' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h5" sx={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              생성된 이력서
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setGeneratedResume(null);
+                setSavedResumeId(null);
+                setSuccessMessage(null);
+              }}
+              sx={{ fontSize: '0.9rem' }}
+            >
+              새로 작성하기
+            </Button>
+          </Box>
           <Typography variant="h5" gutterBottom sx={{ fontSize: '1.5rem', fontWeight: 600 }}>
             생성된 이력서
           </Typography>
@@ -306,7 +369,7 @@ const ResumeCreatePage: React.FC = () => {
                 <Typography sx={{ fontWeight: 'bold', mb: 1, fontSize: '1.1rem' }}>자격증</Typography>
                 {generatedResume?.['기술스택/자격증']?.자격증 && generatedResume['기술스택/자격증'].자격증.length > 0 ? (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {generatedResume['기술스택/자격증'].자격증.map((cert: string, index: number) => (
+                    {generatedResume['기술스택/자격증'].자격증.map((cert: any, index: number) => (
                       <Box key={index} sx={{ 
                         px: 2, 
                         py: 0.5, 
@@ -314,7 +377,12 @@ const ResumeCreatePage: React.FC = () => {
                         borderRadius: 2,
                         fontSize: '1rem'
                       }}>
-                        {cert}
+                        {typeof cert === 'string' ? cert : cert.자격증명 || JSON.stringify(cert)}
+                        {typeof cert === 'object' && cert.취득일 && (
+                          <Typography component="span" sx={{ ml: 1, fontSize: '0.9rem', color: 'text.secondary' }}>
+                            ({cert.취득일})
+                          </Typography>
+                        )}
                       </Box>
                     ))}
                   </Box>
@@ -343,37 +411,65 @@ const ResumeCreatePage: React.FC = () => {
             )}
           </Box>
 
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
-            >
-              이력서 다운로드
-            </Button>
+          <Box sx={{ mt: 3, textAlign: 'center', display: 'flex', gap: 2, justifyContent: 'center' }}>
+            {!savedResumeId ? (
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={<Save />}
+                onClick={handleSaveToDatabase}
+                disabled={isSaving}
+                sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
+              >
+                {isSaving ? '저장 중...' : '이력서 저장'}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  size="large"
+                  sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
+                >
+                  이력서 다운로드
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="large"
+                  endIcon={<ArrowForward />}
+                  onClick={handleGoToRecommendations}
+                  sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
+                >
+                  AI 채용공고 추천 받기
+                </Button>
+              </>
+            )}
           </Box>
         </Paper>
       )}
 
-      <Paper elevation={1} sx={{ mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          aria-label="이력서 작성 방법"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab 
-            label="음성으로 입력" 
-            icon={<Mic />} 
-            sx={{ fontSize: '1rem', minHeight: '64px' }}
-          />
-          <Tab 
-            label="직접 입력" 
-            icon={<Create />} 
-            sx={{ fontSize: '1rem', minHeight: '64px' }}
-          />
-        </Tabs>
+      {!generatedResume && (
+        <>
+          <Paper elevation={1} sx={{ mb: 3 }}>
+            <Tabs 
+              value={tabValue} 
+              onChange={handleTabChange} 
+              aria-label="이력서 작성 방법"
+              sx={{ borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab 
+                label="음성으로 입력" 
+                icon={<Mic />} 
+                sx={{ fontSize: '1rem', minHeight: '64px' }}
+              />
+              <Tab 
+                label="직접 입력" 
+                icon={<Create />} 
+                sx={{ fontSize: '1rem', minHeight: '64px' }}
+              />
+            </Tabs>
 
         <TabPanel value={tabValue} index={0}>
           {/* 음성 입력 탭 */}
@@ -499,21 +595,32 @@ const ResumeCreatePage: React.FC = () => {
       </Paper>
 
       <Box sx={{ textAlign: 'center', mt: 4 }}>
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<Save />}
-          onClick={handleSaveResume}
-          sx={{ 
-            fontSize: '1.2rem',
-            py: 2,
-            px: 4,
-            minHeight: '56px'
-          }}
-        >
-          AI 이력서 생성하기
-        </Button>
+        {isGenerating ? (
+          <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CircularProgress size={60} />
+            <Typography variant="h6" sx={{ fontSize: '1.2rem', color: 'primary.main' }}>
+              AI가 이력서를 생성하고 있습니다...
+            </Typography>
+          </Box>
+        ) : (
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<Save />}
+            onClick={handleSaveResume}
+            sx={{ 
+              fontSize: '1.2rem',
+              py: 2,
+              px: 4,
+              minHeight: '56px'
+            }}
+          >
+            AI 이력서 생성하기
+          </Button>
+        )}
       </Box>
+      </>
+      )}
 
       {/* 플로팅 피드백 버튼 */}
       <Fab

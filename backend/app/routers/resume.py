@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.resume_service import get_resume_service
 from app.services.whisper_service import get_whisper_service
+from app.services.embedding_service import generate_embedding
 from app.models import Resume
 from typing import List, Optional
 import logging
@@ -68,8 +69,6 @@ async def create_resume(
     title: str = Form(...),
     content: str = Form(...),
     skills: Optional[str] = Form(None),
-    experience: Optional[str] = Form(None),
-    education: Optional[str] = Form(None),
     user_id: Optional[int] = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -80,18 +79,28 @@ async def create_resume(
         title: 이력서 제목
         content: 이력서 전체 내용 (JSON 문자열)
         skills: 기술스택 (JSON 배열 문자열)
-        experience: 경력 정보 (JSON 문자열)
-        education: 학력 정보 (JSON 문자열)
         user_id: 사용자 ID
     """
     try:
+        # user_id가 없으면 기본값 1 사용
+        if user_id is None:
+            user_id = 1
+        
+        # 임베딩 생성
+        logger.info("이력서 임베딩 생성 시작...")
+        embedding_str = generate_embedding(content)
+        
+        if embedding_str:
+            logger.info("임베딩 생성 완료")
+        else:
+            logger.warning("임베딩 생성 실패 - 이력서는 저장되지만 추천 기능 사용 불가")
+        
         new_resume = Resume(
             user_id=user_id,
             title=title,
             content=content,
             skills=skills,
-            experience=experience,
-            education=education
+            embedding_array=embedding_str
         )
         
         db.add(new_resume)
@@ -104,9 +113,12 @@ async def create_resume(
                 "id": new_resume.id,
                 "user_id": new_resume.user_id,
                 "title": new_resume.title,
-                "created_at": new_resume.created_at.isoformat()
+                "created_at": new_resume.created_at.isoformat(),
+                "has_embedding": embedding_str is not None
             },
-            "message": "이력서가 성공적으로 생성되었습니다."
+            "message": "이력서가 성공적으로 생성되었습니다." + (
+                " (임베딩 생성 완료)" if embedding_str else " (임베딩 생성 실패)"
+            )
         })
     except Exception as e:
         db.rollback()

@@ -110,11 +110,18 @@ def get_content_based_recommendations(resume_id: int, top_n: int = 20) -> List[d
     """
     engine = create_engine(DATABASE_URL)
     
-    # 이력서 임베딩 조회
+    # 이력서 임베딩 조회 - resumes와 cover_letter_samples 모두 확인
     resume_query = f"""
-    SELECT id, embedding_array
-    FROM {DB_SCHEMA}.cover_letter_samples
-    WHERE id = :resume_id
+    SELECT id, embedding_array FROM (
+        SELECT id, embedding_array
+        FROM {DB_SCHEMA}.resumes
+        WHERE id = :resume_id AND embedding_array IS NOT NULL AND is_active = true
+        UNION ALL
+        SELECT id, embedding_array
+        FROM {DB_SCHEMA}.cover_letter_samples
+        WHERE id = :resume_id AND embedding_array IS NOT NULL
+    ) combined
+    LIMIT 1
     """
     
     with engine.connect() as conn:
@@ -283,12 +290,19 @@ def hybrid_recommend(
     # 다양성/참신성 재정렬
     if enable_diversity and results:
         try:
-            # 이력서 임베딩 조회
+            # 이력서 임베딩 조회 - resumes와 cover_letter_samples 모두 확인
             engine = create_engine(DATABASE_URL)
             resume_query = f"""
-            SELECT id, embedding_array
-            FROM {DB_SCHEMA}.cover_letter_samples
-            WHERE id = :resume_id
+            SELECT id, embedding_array FROM (
+                SELECT id, embedding_array
+                FROM {DB_SCHEMA}.resumes
+                WHERE id = :resume_id AND embedding_array IS NOT NULL AND is_active = true
+                UNION ALL
+                SELECT id, embedding_array
+                FROM {DB_SCHEMA}.cover_letter_samples
+                WHERE id = :resume_id AND embedding_array IS NOT NULL
+            ) combined
+            LIMIT 1
             """
             
             with engine.connect() as conn:

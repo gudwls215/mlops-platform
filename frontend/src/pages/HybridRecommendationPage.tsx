@@ -21,6 +21,7 @@ import {
   Stack,
 } from '@mui/material';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 
 interface Recommendation {
   job_id: number;
@@ -48,8 +49,17 @@ interface RecommendationResponse {
   generated_at: string;
 }
 
+interface Resume {
+  id: number;
+  title: string;
+  user_id: number;
+  created_at: string;
+}
+
 const HybridRecommendationPage: React.FC = () => {
-  const [resumeId, setResumeId] = useState<number>(1);
+  const [searchParams] = useSearchParams();
+  const [resumeId, setResumeId] = useState<number | null>(null);
+  const [resumeList, setResumeList] = useState<Resume[]>([]);
   const [topN, setTopN] = useState<number>(10);
   const [strategy, setStrategy] = useState<string>('weighted');
   const [contentWeight, setContentWeight] = useState<number>(0.6);
@@ -63,8 +73,47 @@ const HybridRecommendationPage: React.FC = () => {
   
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingResumes, setLoadingResumes] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [responseInfo, setResponseInfo] = useState<any>(null);
+
+  // 이력서 리스트 불러오기 (user_id=1)
+  useEffect(() => {
+    const fetchResumes = async () => {
+      setLoadingResumes(true);
+      try {
+        const response = await axios.get(
+          `http://192.168.0.147:9000/api/v1/resume/`,
+          { params: { user_id: 1 } }
+        );
+        const resumes = response.data.data?.resumes || [];
+        setResumeList(resumes);
+      } catch (err: any) {
+        console.error('이력서 리스트 조회 오류:', err);
+      } finally {
+        setLoadingResumes(false);
+      }
+    };
+    
+    fetchResumes();
+  }, []);
+
+  // URL 파라미터에서 resumeId 가져오기 및 자동 추천
+  useEffect(() => {
+    const resumeIdParam = searchParams.get('resumeId');
+    if (resumeIdParam) {
+      const id = parseInt(resumeIdParam, 10);
+      if (!isNaN(id)) {
+        setResumeId(id);
+        // resumeId가 설정되면 자동으로 추천 가져오기
+        const fetchData = async () => {
+          await fetchRecommendationsWithId(id);
+        };
+        fetchData();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // 가중치 자동 조정
   useEffect(() => {
@@ -79,7 +128,7 @@ const HybridRecommendationPage: React.FC = () => {
     }
   }, [contentWeight, diversityWeight, noveltyWeight, enableDiversity]);
 
-  const fetchRecommendations = async () => {
+  const fetchRecommendationsWithId = async (id: number) => {
     setLoading(true);
     setError('');
     
@@ -99,7 +148,7 @@ const HybridRecommendationPage: React.FC = () => {
       }
       
       const response = await axios.get<RecommendationResponse>(
-        `http://192.168.0.147:9000/api/hybrid-recommendations/jobs/${resumeId}`,
+        `http://192.168.0.147:9000/api/hybrid-recommendations/jobs/${id}`,
         { params }
       );
       
@@ -111,6 +160,14 @@ const HybridRecommendationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRecommendations = async () => {
+    if (resumeId === null) {
+      setError('이력서를 선택해주세요.');
+      return;
+    }
+    await fetchRecommendationsWithId(resumeId);
   };
 
   const getScoreColor = (score: number): string => {
@@ -172,17 +229,48 @@ const HybridRecommendationPage: React.FC = () => {
 
             <Stack spacing={2}>
               <FormControl fullWidth>
-                <FormLabel>이력서 ID</FormLabel>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <FormLabel>이력서 선택</FormLabel>
+                  {resumeId && (
+                    <Chip 
+                      label={`선택: #${resumeId}`} 
+                      size="small" 
+                      color="primary" 
+                      variant="outlined"
+                    />
+                  )}
+                </Box>
                 <Select
-                  value={resumeId}
+                  value={resumeId || ''}
                   onChange={(e) => setResumeId(Number(e.target.value))}
                   size="small"
+                  disabled={loadingResumes}
+                  displayEmpty
                 >
-                  {[1, 2, 3, 4, 5].map((id) => (
-                    <MenuItem key={id} value={id}>
-                      이력서 {id}
+                  {loadingResumes ? (
+                    <MenuItem value="">
+                      <em>로딩 중...</em>
                     </MenuItem>
-                  ))}
+                  ) : resumeList.length === 0 ? (
+                    <MenuItem value="">
+                      <em>이력서가 없습니다</em>
+                    </MenuItem>
+                  ) : (
+                    [
+                      <MenuItem key="placeholder" value="" disabled>
+                        <em>이력서를 선택하세요</em>
+                      </MenuItem>,
+                      ...resumeList.map((resume) => {
+                        const date = new Date(resume.created_at);
+                        const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+                        return (
+                          <MenuItem key={resume.id} value={resume.id}>
+                            #{resume.id} - {resume.title.length > 30 ? resume.title.substring(0, 30) + '...' : resume.title} ({dateStr})
+                          </MenuItem>
+                        );
+                      })
+                    ]
+                  )}
                 </Select>
               </FormControl>
 
