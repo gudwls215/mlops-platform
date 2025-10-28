@@ -41,20 +41,13 @@ async def get_resumes(
         return JSONResponse(content={
             "status": "success",
             "data": {
-                "total": total,
-                "skip": skip,
-                "limit": limit,
-                "resumes": [
-                    {
-                        "id": r.id,
-                        "user_id": r.user_id,
-                        "title": r.title,
-                        "skills": json.loads(r.skills) if r.skills else [],
-                        "created_at": r.created_at.isoformat() if r.created_at else None,
-                        "updated_at": r.updated_at.isoformat() if r.updated_at else None
-                    }
-                    for r in resumes
-                ]
+                "id": resume.id,
+                "user_id": resume.user_id,
+                "title": resume.title,
+                "content": resume.content if resume.content else "{}",
+                "skills": json.loads(resume.skills) if resume.skills else [],
+                "created_at": resume.created_at.isoformat() if resume.created_at else None,
+                "updated_at": resume.updated_at.isoformat() if resume.updated_at else None
             }
         })
     except Exception as e:
@@ -149,10 +142,8 @@ async def get_resume(resume_id: int, db: Session = Depends(get_db)):
                 "id": resume.id,
                 "user_id": resume.user_id,
                 "title": resume.title,
-                "content": json.loads(resume.content) if resume.content else {},
+                "content": resume.content,  # content는 이미 JSON 문자열 형태로 저장됨
                 "skills": json.loads(resume.skills) if resume.skills else [],
-                "experience": json.loads(resume.experience) if resume.experience else [],
-                "education": json.loads(resume.education) if resume.education else [],
                 "created_at": resume.created_at.isoformat() if resume.created_at else None,
                 "updated_at": resume.updated_at.isoformat() if resume.updated_at else None
             }

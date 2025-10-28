@@ -43,7 +43,7 @@ async def get_job_postings(
             query = query.filter(JobPosting.experience_level == experience_level)
         
         total = query.count()
-        job_postings = query.order_by(JobPosting.scraped_at.desc()).offset(skip).limit(limit).all()
+        job_postings = query.order_by(JobPosting.created_at.desc()).offset(skip).limit(limit).all()
         
         return JSONResponse(content={
             "status": "success",
@@ -61,7 +61,7 @@ async def get_job_postings(
                         "experience_level": jp.experience_level,
                         "salary_min": jp.salary_min,
                         "salary_max": jp.salary_max,
-                        "scraped_at": jp.scraped_at.isoformat() if jp.scraped_at else None
+                        "created_at": jp.created_at.isoformat() if jp.created_at else None
                     }
                     for jp in job_postings
                 ]
@@ -103,7 +103,7 @@ async def get_job_posting(job_id: int, db: Session = Depends(get_db)):
                 "employment_type": job_posting.employment_type,
                 "experience_level": job_posting.experience_level,
                 "source_url": job_posting.source_url,
-                "scraped_at": job_posting.scraped_at.isoformat() if job_posting.scraped_at else None
+                "created_at": job_posting.created_at.isoformat() if job_posting.created_at else None
             }
         })
     except Exception as e:
@@ -140,7 +140,7 @@ async def search_job_postings(
         )
         
         total = query.count()
-        job_postings = query.order_by(JobPosting.scraped_at.desc()).offset(skip).limit(limit).all()
+        job_postings = query.order_by(JobPosting.created_at.desc()).offset(skip).limit(limit).all()
         
         return JSONResponse(content={
             "status": "success",
@@ -157,7 +157,7 @@ async def search_job_postings(
                         "location": jp.location,
                         "employment_type": jp.employment_type,
                         "experience_level": jp.experience_level,
-                        "scraped_at": jp.scraped_at.isoformat() if jp.scraped_at else None
+                        "created_at": jp.created_at.isoformat() if jp.created_at else None
                     }
                     for jp in job_postings
                 ]

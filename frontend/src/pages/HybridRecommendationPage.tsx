@@ -19,6 +19,10 @@ import {
   CircularProgress,
   Alert,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
@@ -76,6 +80,12 @@ const HybridRecommendationPage: React.FC = () => {
   const [loadingResumes, setLoadingResumes] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [responseInfo, setResponseInfo] = useState<any>(null);
+  
+  // 자기소개서 생성 관련 상태
+  const [coverLetterModalOpen, setCoverLetterModalOpen] = useState<boolean>(false);
+  const [generatingCoverLetter, setGeneratingCoverLetter] = useState<boolean>(false);
+  const [selectedJob, setSelectedJob] = useState<Recommendation | null>(null);
+  const [generatedCoverLetter, setGeneratedCoverLetter] = useState<string>('');
 
   // 이력서 리스트 불러오기 (user_id=1)
   useEffect(() => {
@@ -168,6 +178,60 @@ const HybridRecommendationPage: React.FC = () => {
       return;
     }
     await fetchRecommendationsWithId(resumeId);
+  };
+
+  const handleGenerateCoverLetter = async (job: Recommendation) => {
+    if (!resumeId) {
+      setError('이력서를 먼저 선택해주세요.');
+      return;
+    }
+
+    setSelectedJob(job);
+    setCoverLetterModalOpen(true);
+    setGeneratingCoverLetter(true);
+    setGeneratedCoverLetter('');
+
+    try {
+      // 1. 이력서 데이터 조회
+      const resumeResponse = await axios.get(
+        `http://192.168.0.147:9000/api/v1/resume/${resumeId}`
+      );
+      
+      // 2. 채용공고 데이터 조회
+      const jobResponse = await axios.get(
+        `http://192.168.0.147:9000/api/v1/job/${job.job_id}`
+      );
+
+      // 3. 자기소개서 생성 API 호출
+      const formData = new FormData();
+      formData.append('resume_data', resumeResponse.data.data?.content || '{}');
+      formData.append('job_posting_data', JSON.stringify({
+        title: jobResponse.data.data?.title || job.title,
+        company: jobResponse.data.data?.company || job.company,
+        description: jobResponse.data.data?.description || '',
+        requirements: jobResponse.data.data?.requirements || '',
+      }));
+      formData.append('tone', 'professional');
+
+      const coverLetterResponse = await axios.post(
+        `http://192.168.0.147:9000/api/cover-letter/generate`,
+        formData
+      );
+
+      setGeneratedCoverLetter(coverLetterResponse.data.content || coverLetterResponse.data.data?.content || '자기소개서 생성 완료');
+    } catch (err: any) {
+      console.error('자기소개서 생성 오류:', err);
+      setError(err.response?.data?.error || err.response?.data?.detail || '자기소개서 생성 중 오류가 발생했습니다.');
+      setGeneratedCoverLetter('자기소개서 생성에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setGeneratingCoverLetter(false);
+    }
+  };
+
+  const handleCloseCoverLetterModal = () => {
+    setCoverLetterModalOpen(false);
+    setSelectedJob(null);
+    setGeneratedCoverLetter('');
   };
 
   const getScoreColor = (score: number): string => {
@@ -544,6 +608,17 @@ const HybridRecommendationPage: React.FC = () => {
                         </Box>
                       )}
                     </Box>
+
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handleGenerateCoverLetter(rec)}
+                        disabled={!resumeId}
+                      >
+                        자기소개서 생성
+                      </Button>
+                    </Box>
                   </CardContent>
                 </Card>
               ))}
@@ -557,6 +632,57 @@ const HybridRecommendationPage: React.FC = () => {
           )}
         </Box>
       </Box>
+
+      {/* 자기소개서 생성 모달 */}
+      <Dialog
+        open={coverLetterModalOpen}
+        onClose={handleCloseCoverLetterModal}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {selectedJob ? `${selectedJob.company} - ${selectedJob.title}` : '자기소개서'}
+        </DialogTitle>
+        <DialogContent>
+          {generatingCoverLetter ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+              <CircularProgress size={60} />
+              <Typography variant="h6" sx={{ mt: 2 }}>
+                AI가 자기소개서를 생성하고 있습니다...
+              </Typography>
+            </Box>
+          ) : generatedCoverLetter ? (
+            <Box sx={{ mt: 2 }}>
+              <Paper sx={{ p: 3, bgcolor: '#f5f5f5' }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.8,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  {generatedCoverLetter}
+                </Typography>
+              </Paper>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCoverLetterModal}>닫기</Button>
+          {generatedCoverLetter && !generatingCoverLetter && (
+            <Button
+              variant="contained"
+              onClick={() => {
+                // 다운로드 기능은 추후 구현
+                alert('다운로드 기능은 추후 구현 예정입니다.');
+              }}
+            >
+              다운로드
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
