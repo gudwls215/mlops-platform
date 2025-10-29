@@ -422,11 +422,19 @@
   - [ ] 병렬 처리 구현
 
 ### Week 15-16: MLflow 연동 및 실험 관리
-- [ ] MLflow 설치 및 설정
-  - [ ] MLflow Tracking Server 설치
-  - [ ] SQLite/PostgreSQL 백엔드 설정
-  - [ ] 아티팩트 스토어 설정 (로컬 파일시스템)
-  - [ ] 웹 UI 접근 설정
+- [x] MLflow 설치 및 설정
+  - [x] MLflow Tracking Server 설치 (v3.5.1)
+  - [x] PostgreSQL 백엔드 설정 (기존 DB 활용: 114.202.2.226:5433)
+  - [x] 아티팩트 스토어 설정 (로컬 파일시스템: mlflow-artifacts/)
+  - [x] 웹 UI 접근 설정 (http://192.168.0.147:5000)
+  - [x] MLflow 서버 실행 (PID: 3246360, /tmp/mlflow.log)
+  - [x] 환경 변수 설정 (.env.mlflow)
+  - [x] MLflow 유틸리티 함수 작성 (mlflow_config.py)
+    - get_or_create_experiment(): 실험 생성/조회
+    - log_model_metrics(): 메트릭 로깅
+    - log_sklearn_model(): scikit-learn 모델 로깅
+    - load_model_from_registry(): 모델 레지스트리에서 로드
+    - get_best_run(): 최고 성능 run 찾기
 
 - [ ] 실험 추적 시스템 구축
   - [ ] 모델 학습 코드에 MLflow 연동
