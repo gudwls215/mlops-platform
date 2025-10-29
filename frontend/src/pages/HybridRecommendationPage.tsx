@@ -261,6 +261,20 @@ const HybridRecommendationPage: React.FC = () => {
     setGeneratedCoverLetter('');
   };
 
+  const handleDownloadCoverLetter = () => {
+    if (!generatedCoverLetter || !selectedJob) return;
+
+    const blob = new Blob([generatedCoverLetter], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `자기소개서_${selectedJob.company}_${selectedJob.title}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const getScoreColor = (score: number): string => {
     if (score >= 0.7) return '#4caf50';
     if (score >= 0.5) return '#ff9800';
@@ -702,10 +716,7 @@ const HybridRecommendationPage: React.FC = () => {
           {generatedCoverLetter && !generatingCoverLetter && (
             <Button
               variant="contained"
-              onClick={() => {
-                // 다운로드 기능은 추후 구현
-                alert('다운로드 기능은 추후 구현 예정입니다.');
-              }}
+              onClick={handleDownloadCoverLetter}
             >
               다운로드
             </Button>

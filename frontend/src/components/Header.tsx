@@ -1,10 +1,19 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { Description, Work, Create, Recommend } from '@mui/icons-material';
+import { Description, Work, Create, Recommend, Refresh } from '@mui/icons-material';
+import { useAppContext } from '../contexts/AppContext';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
+  const { resetAll } = useAppContext();
+
+  const handleNewResume = () => {
+    if (window.confirm('새로운 이력서를 작성하시겠습니까? 현재 진행 중인 내용이 초기화됩니다.')) {
+      resetAll();
+      navigate('/resume/create');
+    }
+  };
 
   return (
     <AppBar position="static" elevation={2}>
@@ -25,6 +34,21 @@ const Header: React.FC = () => {
         </Typography>
         
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2 }}>
+          <Button
+            color="inherit"
+            startIcon={<Refresh />}
+            onClick={handleNewResume}
+            sx={{ 
+              fontSize: '1rem', 
+              px: 2,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              }
+            }}
+          >
+            새 이력서
+          </Button>
           <Button
             color="inherit"
             startIcon={<Create />}

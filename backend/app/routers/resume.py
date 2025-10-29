@@ -41,13 +41,17 @@ async def get_resumes(
         return JSONResponse(content={
             "status": "success",
             "data": {
-                "id": resume.id,
-                "user_id": resume.user_id,
-                "title": resume.title,
-                "content": resume.content if resume.content else "{}",
-                "skills": json.loads(resume.skills) if resume.skills else [],
-                "created_at": resume.created_at.isoformat() if resume.created_at else None,
-                "updated_at": resume.updated_at.isoformat() if resume.updated_at else None
+                "total": total,
+                "resumes": [
+                    {
+                        "id": r.id,
+                        "user_id": r.user_id,
+                        "title": r.title,
+                        "created_at": r.created_at.isoformat() if r.created_at else None,
+                        "updated_at": r.updated_at.isoformat() if r.updated_at else None
+                    }
+                    for r in resumes
+                ]
             }
         })
     except Exception as e:
