@@ -397,7 +397,12 @@
     - [x] HybridRecommendationPage: 자기소개서 생성 완료 후 명확한 안내 메시지
     - [x] 자기소개서 모달에 "다운로드 후 완료" 버튼 추가
     - [x] 플로우 완료 상태 Alert 표시 (currentStep === 3)
-  - [ ] 플로우 완료 후 결과 요약 페이지
+  - [x] 플로우 완료 후 결과 요약 페이지
+    - [x] FlowSummaryPage.tsx 컴포넌트 생성
+    - [x] 이력서, 채용공고, 자기소개서 정보 표시
+    - [x] 다운로드 및 새 이력서 작성 액션 버튼
+    - [x] App.tsx에 /summary 라우트 추가
+    - [x] HybridRecommendationPage에서 "결과 요약 보기" 버튼으로 네비게이션
 
 - [ ] 직무 추천 모델
   - [ ] 경력 분석 알고리즘

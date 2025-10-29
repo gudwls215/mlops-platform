@@ -16,6 +16,7 @@ import CoverLetterPage from './pages/CoverLetterPage';
 import JobListPage from './pages/JobListPage';
 import LabelingPage from './pages/LabelingPage';
 import HybridRecommendationPage from './pages/HybridRecommendationPage';
+import FlowSummaryPage from './pages/FlowSummaryPage';
 
 // 장년층 친화적 테마 설정
 const theme = createTheme({
@@ -105,6 +106,7 @@ function App() {
                 <Route path="/jobs" element={<JobListPage />} />
                 <Route path="/labeling" element={<LabelingPage />} />
                 <Route path="/recommendations" element={<HybridRecommendationPage />} />
+                <Route path="/summary" element={<FlowSummaryPage />} />
               </Routes>
             </Box>
             <Footer />

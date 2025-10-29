@@ -25,7 +25,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import axios from 'axios';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
 import FlowStepIndicator from '../components/FlowStepIndicator';
 
@@ -64,6 +64,7 @@ interface Resume {
 
 const HybridRecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { currentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep, currentStep } = useAppContext();
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [resumeList, setResumeList] = useState<Resume[]>([]);
@@ -273,6 +274,10 @@ const HybridRecommendationPage: React.FC = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleGoToSummary = () => {
+    navigate('/summary');
   };
 
   const getScoreColor = (score: number): string => {
@@ -749,13 +754,10 @@ const HybridRecommendationPage: React.FC = () => {
               </Button>
               <Button
                 variant="contained"
-                color="success"
-                onClick={() => {
-                  handleDownloadCoverLetter();
-                  handleCloseCoverLetterModal();
-                }}
+                color="primary"
+                onClick={handleGoToSummary}
               >
-                다운로드 후 완료
+                결과 요약 보기
               </Button>
             </>
           )}
