@@ -325,6 +325,20 @@ const HybridRecommendationPage: React.FC = () => {
         하이브리드 추천 시스템: Content-based + Collaborative Filtering + 다양성/참신성
       </Typography>
 
+      {/* 플로우 완료 상태 표시 (자기소개서 생성 완료 시) */}
+      {currentStep === 3 && generatedCoverLetter && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+            ✅ 모든 단계가 완료되었습니다!
+          </Typography>
+          <Typography variant="body2">
+            이력서 작성 → 채용공고 추천 → 자기소개서 생성이 모두 완료되었습니다.
+            <br />
+            원하시는 경우 다른 채용공고에 대해서도 자기소개서를 생성할 수 있습니다.
+          </Typography>
+        </Alert>
+      )}
+
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
         {/* 왼쪽: 설정 패널 */}
         <Box sx={{ flex: { xs: '1', md: '0 0 33%' } }}>
@@ -696,6 +710,18 @@ const HybridRecommendationPage: React.FC = () => {
             </Box>
           ) : generatedCoverLetter ? (
             <Box sx={{ mt: 2 }}>
+              {/* 완료 상태 표시 */}
+              <Alert severity="success" sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  🎉 모든 단계가 완료되었습니다!
+                </Typography>
+                <Typography variant="body2">
+                  이력서 작성 → 채용공고 추천 → 자기소개서 생성이 모두 완료되었습니다.
+                  <br />
+                  아래 자기소개서를 확인하고 다운로드하세요.
+                </Typography>
+              </Alert>
+
               <Paper sx={{ p: 3, bgcolor: '#f5f5f5' }}>
                 <Typography
                   variant="body1"
@@ -714,12 +740,24 @@ const HybridRecommendationPage: React.FC = () => {
         <DialogActions>
           <Button onClick={handleCloseCoverLetterModal}>닫기</Button>
           {generatedCoverLetter && !generatingCoverLetter && (
-            <Button
-              variant="contained"
-              onClick={handleDownloadCoverLetter}
-            >
-              다운로드
-            </Button>
+            <>
+              <Button
+                variant="outlined"
+                onClick={handleDownloadCoverLetter}
+              >
+                다운로드
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={() => {
+                  handleDownloadCoverLetter();
+                  handleCloseCoverLetterModal();
+                }}
+              >
+                다운로드 후 완료
+              </Button>
+            </>
           )}
         </DialogActions>
       </Dialog>
