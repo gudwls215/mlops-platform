@@ -3,6 +3,7 @@
 - 로지스틱 회귀(Logistic Regression) 모델
 - Random Forest 모델
 - 성능 지표: Accuracy, Precision, Recall, F1 Score, ROC-AUC
+- MLflow 연동: 실험 추적 및 모델 레지스트리
 """
 
 import sys
@@ -29,8 +30,20 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+# MLflow import
+import mlflow
+import mlflow.sklearn
+from app.mlflow_config import get_or_create_experiment, MLFLOW_TRACKING_URI
+
 # 환경 변수 로드
 load_dotenv()
+
+# MLflow logged-models API 비활성화
+os.environ["MLFLOW_ENABLE_LOGGED_MODEL_CREATION"] = "false"
+
+# MLflow 설정
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+print(f"MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
 
 # 데이터베이스 연결 설정
 DB_HOST = os.getenv('POSTGRES_HOST', '114.202.2.226')
@@ -116,54 +129,91 @@ class BaselineModelTrainer:
         
         return X, y
     
-    def train_logistic_regression(self, X_train, y_train):
+    def train_logistic_regression(self, X_train, y_train, mlflow_run=None):
         """로지스틱 회귀 모델 학습"""
         print("\n" + "="*60)
         print("로지스틱 회귀 모델 학습")
         print("="*60)
         
+        # 하이퍼파라미터
+        params = {
+            'max_iter': 1000,
+            'random_state': 42,
+            'class_weight': 'balanced',
+            'solver': 'lbfgs',
+            'model_type': 'logistic_regression'
+        }
+        
+        # MLflow에 파라미터 로깅
+        if mlflow_run:
+            mlflow.log_params(params)
+        
         model = LogisticRegression(
-            max_iter=1000,
-            random_state=42,
-            class_weight='balanced',  # 클래스 불균형 대응
-            solver='lbfgs'
+            max_iter=params['max_iter'],
+            random_state=params['random_state'],
+            class_weight=params['class_weight'],
+            solver=params['solver']
         )
         
         start_time = datetime.now()
         model.fit(X_train, y_train)
         elapsed = (datetime.now() - start_time).total_seconds()
+        
+        # MLflow에 학습 시간 로깅
+        if mlflow_run:
+            mlflow.log_metric("training_time_seconds", elapsed)
         
         print(f"학습 완료 (소요 시간: {elapsed:.2f}초)")
         
         self.models['logistic_regression'] = model
         return model
     
-    def train_random_forest(self, X_train, y_train):
+    def train_random_forest(self, X_train, y_train, mlflow_run=None):
         """Random Forest 모델 학습"""
         print("\n" + "="*60)
         print("Random Forest 모델 학습")
         print("="*60)
         
+        # 하이퍼파라미터
+        params = {
+            'n_estimators': 100,
+            'max_depth': 10,
+            'min_samples_split': 10,
+            'min_samples_leaf': 4,
+            'random_state': 42,
+            'class_weight': 'balanced',
+            'n_jobs': -1,
+            'model_type': 'random_forest'
+        }
+        
+        # MLflow에 파라미터 로깅
+        if mlflow_run:
+            mlflow.log_params(params)
+        
         model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
-            min_samples_split=10,
-            min_samples_leaf=4,
-            random_state=42,
-            class_weight='balanced',  # 클래스 불균형 대응
-            n_jobs=-1  # 병렬 처리
+            n_estimators=params['n_estimators'],
+            max_depth=params['max_depth'],
+            min_samples_split=params['min_samples_split'],
+            min_samples_leaf=params['min_samples_leaf'],
+            random_state=params['random_state'],
+            class_weight=params['class_weight'],
+            n_jobs=params['n_jobs']
         )
         
         start_time = datetime.now()
         model.fit(X_train, y_train)
         elapsed = (datetime.now() - start_time).total_seconds()
         
+        # MLflow에 학습 시간 로깅
+        if mlflow_run:
+            mlflow.log_metric("training_time_seconds", elapsed)
+        
         print(f"학습 완료 (소요 시간: {elapsed:.2f}초)")
         
         self.models['random_forest'] = model
         return model
     
-    def evaluate_model(self, model, X, y, dataset_name='Test'):
+    def evaluate_model(self, model, X, y, dataset_name='Test', mlflow_run=None):
         """
         모델 평가
         
@@ -172,6 +222,7 @@ class BaselineModelTrainer:
             X: 입력 데이터
             y: 타겟 레이블
             dataset_name: 데이터셋 이름
+            mlflow_run: MLflow run 객체
         """
         # 예측
         y_pred = model.predict(X)
@@ -186,6 +237,21 @@ class BaselineModelTrainer:
         
         # 혼동 행렬
         cm = confusion_matrix(y, y_pred)
+        
+        # MLflow에 메트릭 로깅
+        if mlflow_run:
+            prefix = dataset_name.lower()
+            mlflow.log_metric(f"{prefix}_accuracy", accuracy)
+            mlflow.log_metric(f"{prefix}_precision", precision)
+            mlflow.log_metric(f"{prefix}_recall", recall)
+            mlflow.log_metric(f"{prefix}_f1_score", f1)
+            mlflow.log_metric(f"{prefix}_roc_auc", roc_auc)
+            
+            # 혼동 행렬 메트릭
+            mlflow.log_metric(f"{prefix}_tn", int(cm[0][0]))
+            mlflow.log_metric(f"{prefix}_fp", int(cm[0][1]))
+            mlflow.log_metric(f"{prefix}_fn", int(cm[1][0]))
+            mlflow.log_metric(f"{prefix}_tp", int(cm[1][1]))
         
         # 결과 출력
         print(f"\n{dataset_name} 성능 평가:")
@@ -234,12 +300,15 @@ class BaselineModelTrainer:
         print(f"\n평가 결과 저장 완료: {results_path}")
     
     def run(self):
-        """전체 프로세스 실행"""
+        """전체 프로세스 실행 (MLflow 연동)"""
         print("="*60)
-        print("베이스라인 모델 학습 시작")
+        print("베이스라인 모델 학습 시작 (MLflow 연동)")
         print("="*60)
         
         start_time = datetime.now()
+        
+        # MLflow 실험 설정
+        experiment_id = get_or_create_experiment()
         
         try:
             # 1. 데이터 로드
@@ -252,35 +321,85 @@ class BaselineModelTrainer:
                 print("\n오류: 데이터 로드 실패")
                 return
             
-            # 2. 로지스틱 회귀 학습 및 평가
-            print("\n[2단계] 로지스틱 회귀 모델")
-            lr_model = self.train_logistic_regression(X_train, y_train)
-            
-            lr_train_results = self.evaluate_model(lr_model, X_train, y_train, 'Train')
-            lr_val_results = self.evaluate_model(lr_model, X_val, y_val, 'Validation')
-            lr_test_results = self.evaluate_model(lr_model, X_test, y_test, 'Test')
-            
-            self.results['logistic_regression'] = {
-                'train': lr_train_results,
-                'validation': lr_val_results,
-                'test': lr_test_results
+            # 데이터 메타정보
+            data_info = {
+                'train_samples': len(X_train),
+                'val_samples': len(X_val),
+                'test_samples': len(X_test),
+                'embedding_dim': X_train.shape[1],
+                'train_positive_ratio': float(y_train.sum() / len(y_train))
             }
+            
+            # 2. 로지스틱 회귀 학습 및 평가 (MLflow Run)
+            print("\n[2단계] 로지스틱 회귀 모델")
+            with mlflow.start_run(experiment_id=experiment_id, run_name="Logistic_Regression_Baseline") as run:
+                # 태그 설정
+                mlflow.set_tag("model_type", "logistic_regression")
+                mlflow.set_tag("phase", "baseline")
+                mlflow.set_tag("framework", "scikit-learn")
+                
+                # 데이터 정보 로깅
+                mlflow.log_params(data_info)
+                
+                # 모델 학습
+                lr_model = self.train_logistic_regression(X_train, y_train, mlflow_run=run)
+                
+                # 평가
+                lr_train_results = self.evaluate_model(lr_model, X_train, y_train, 'Train', mlflow_run=run)
+                lr_val_results = self.evaluate_model(lr_model, X_val, y_val, 'Validation', mlflow_run=run)
+                lr_test_results = self.evaluate_model(lr_model, X_test, y_test, 'Test', mlflow_run=run)
+                
+                # 모델 저장 (MLflow)
+                mlflow.sklearn.log_model(
+                    sk_model=lr_model,
+                    artifact_path="model",
+                    registered_model_name="LogisticRegression_CoverLetter"
+                )
+                
+                self.results['logistic_regression'] = {
+                    'train': lr_train_results,
+                    'validation': lr_val_results,
+                    'test': lr_test_results,
+                    'mlflow_run_id': run.info.run_id
+                }
+                
+                print(f"\nMLflow Run ID: {run.info.run_id}")
             
             self.save_model('logistic_regression')
             
-            # 3. Random Forest 학습 및 평가
+            # 3. Random Forest 학습 및 평가 (MLflow Run)
             print("\n[3단계] Random Forest 모델")
-            rf_model = self.train_random_forest(X_train, y_train)
-            
-            rf_train_results = self.evaluate_model(rf_model, X_train, y_train, 'Train')
-            rf_val_results = self.evaluate_model(rf_model, X_val, y_val, 'Validation')
-            rf_test_results = self.evaluate_model(rf_model, X_test, y_test, 'Test')
-            
-            self.results['random_forest'] = {
-                'train': rf_train_results,
-                'validation': rf_val_results,
-                'test': rf_test_results
-            }
+            with mlflow.start_run(experiment_id=experiment_id, run_name="RandomForest_Baseline") as run:
+                # 태그 설정
+                mlflow.set_tag("model_type", "random_forest")
+                mlflow.set_tag("phase", "baseline")
+                mlflow.set_tag("framework", "scikit-learn")
+                
+                # 데이터 정보 로깅
+                mlflow.log_params(data_info)
+                
+                # 모델 학습
+                rf_model = self.train_random_forest(X_train, y_train, mlflow_run=run)
+                
+                # 평가
+                rf_train_results = self.evaluate_model(rf_model, X_train, y_train, 'Train', mlflow_run=run)
+                rf_val_results = self.evaluate_model(rf_model, X_val, y_val, 'Validation', mlflow_run=run)
+                rf_test_results = self.evaluate_model(rf_model, X_test, y_test, 'Test', mlflow_run=run)
+                
+                # 모델 저장 (MLflow)
+                mlflow.sklearn.log_model(
+                    sk_model=rf_model,
+                    artifact_path="model"
+                )
+                
+                self.results['random_forest'] = {
+                    'train': rf_train_results,
+                    'validation': rf_val_results,
+                    'test': rf_test_results,
+                    'mlflow_run_id': run.info.run_id
+                }
+                
+                print(f"\nMLflow Run ID: {run.info.run_id}")
             
             self.save_model('random_forest')
             
@@ -312,6 +431,7 @@ class BaselineModelTrainer:
             
             print("\n" + "="*60)
             print(f"베이스라인 모델 학습 완료 (소요 시간: {elapsed:.2f}초)")
+            print(f"MLflow UI: {MLFLOW_TRACKING_URI}")
             print("="*60)
             
         except Exception as e:
