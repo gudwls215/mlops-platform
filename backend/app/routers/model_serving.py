@@ -23,6 +23,7 @@ from app.services.batch_queue import (
     BatchJob,
     BatchStatus
 )
+from app.services.prediction_cache import get_prediction_cache
 
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,8 @@ async def predict(
 async def predict_batch(
     input_data: BatchPredictionInput,
     return_probabilities: bool = True,
+    use_parallel: bool = False,
+    chunk_size: int = 100,
     service: ModelServingService = Depends(get_model_service)
 ) -> Dict[str, Any]:
     """
@@ -135,6 +138,8 @@ async def predict_batch(
     Args:
         input_data: 예측 입력 배치
         return_probabilities: 확률 반환 여부
+        use_parallel: 병렬 처리 사용 여부 (대량 배치 시 권장)
+        chunk_size: 병렬 처리 청크 크기 (기본값: 100)
         
     Returns:
         예측 결과 리스트
@@ -149,9 +154,13 @@ async def predict_batch(
             ]
         }
         ```
+        
+    Note:
+        - use_parallel=true: 대량 배치(>100개) 시 성능 향상
+        - chunk_size: 병렬 처리 단위 (기본값 100, 조정 가능)
     """
     try:
-        logger.info(f"배치 예측 요청: batch_size={len(input_data.batch)}")
+        logger.info(f"배치 예측 요청: batch_size={len(input_data.batch)}, parallel={use_parallel}")
         
         # 입력 검증
         if not input_data.batch:
@@ -166,14 +175,17 @@ async def predict_batch(
         # 배치 예측 수행
         results = await service.predict_batch(
             batch_features=batch_features,
-            return_probabilities=return_probabilities
+            return_probabilities=return_probabilities,
+            use_parallel=use_parallel,
+            chunk_size=chunk_size
         )
         
         return {
             "success": True,
             "data": {
                 "predictions": [result.dict() for result in results],
-                "count": len(results)
+                "count": len(results),
+                "parallel_processing": use_parallel
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -439,4 +451,89 @@ async def clear_completed_jobs(
     except Exception as e:
         logger.error(f"작업 정리 실패: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== 캐시 관련 엔드포인트 =====
+
+@router.get("/cache/stats", summary="캐시 통계 조회")
+async def get_cache_stats() -> Dict[str, Any]:
+    """
+    예측 결과 캐시 통계 조회
+    
+    Returns:
+        캐시 통계 (히트율, 키 개수 등)
+    """
+    try:
+        cache = get_prediction_cache()
+        stats = cache.get_stats()
+        
+        return {
+            "success": True,
+            "data": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"캐시 통계 조회 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cache/invalidate", summary="캐시 무효화")
+async def invalidate_cache(
+    pattern: str = "pred:*",
+    model_version: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    캐시 무효화
+    
+    Args:
+        pattern: 삭제할 키 패턴 (기본값: "pred:*")
+        model_version: 특정 모델 버전의 캐시만 삭제 (선택사항)
+        
+    Returns:
+        무효화 결과
+    """
+    try:
+        cache = get_prediction_cache()
+        
+        if model_version:
+            cache.invalidate_by_model_version(model_version)
+            message = f"모델 버전 {model_version}의 캐시를 무효화했습니다."
+        else:
+            cache.invalidate(pattern)
+            message = f"패턴 {pattern}의 캐시를 무효화했습니다."
+        
+        return {
+            "success": True,
+            "message": message,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"캐시 무효화 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cache/clear", summary="모든 캐시 삭제")
+async def clear_all_cache() -> Dict[str, Any]:
+    """
+    모든 캐시 삭제 (주의: 전체 DB 삭제)
+    
+    Returns:
+        삭제 결과
+    """
+    try:
+        cache = get_prediction_cache()
+        cache.clear_all()
+        
+        return {
+            "success": True,
+            "message": "모든 캐시가 삭제되었습니다.",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"캐시 전체 삭제 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 

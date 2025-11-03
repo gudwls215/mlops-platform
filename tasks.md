@@ -454,10 +454,28 @@
     - 성능 테스트: P95 28ms (목표 < 2초 달성)
     - API 문서: Swagger UI (/docs)
 
-- [ ] 성능 최적화
-  - [ ] 모델 추론 속도 최적화
-  - [ ] 캐싱 전략 구현
-  - [ ] 병렬 처리 구현
+- [x] 성능 최적화
+  - [x] 모델 추론 속도 최적화
+    - performance.py: PerformanceOptimizer 구현
+    - NumPy float32 사용 (메모리 50% 절약)
+    - C-contiguous 배열로 변환 (캐시 효율성 향상)
+    - 벡터화된 전처리 (루프 제거)
+    - 메모리 최적화 및 가비지 컬렉션
+  - [x] 캐싱 전략 구현
+    - prediction_cache.py: Redis 기반 캐싱 시스템
+    - 입력 해싱 기반 캐시 키 생성 (SHA256)
+    - TTL 자동 관리 (기본 3600초)
+    - 캐시 무효화 전략 (패턴 기반, 모델 버전별)
+    - GET /api/model/cache/stats - 캐시 통계
+    - DELETE /api/model/cache/invalidate - 캐시 무효화
+    - DELETE /api/model/cache/clear - 전체 삭제
+  - [x] 병렬 처리 구현
+    - parallel.py: 멀티스레딩/멀티프로세싱 지원
+    - 배치 청크 분할 및 병렬 실행
+    - ThreadPoolExecutor (I/O 바운드)
+    - ProcessPoolExecutor (CPU 바운드)
+    - 자동 결과 병합
+    - POST /api/model/predict/batch?use_parallel=true
 
 ### Week 15-16: MLflow 연동 및 실험 관리
 - [x] MLflow 설치 및 설정

@@ -19,6 +19,11 @@ from threading import Lock
 import numpy as np
 from pydantic import BaseModel, Field
 
+# 성능 최적화 유틸리티
+from app.utils.performance import get_optimizer
+from app.utils.parallel import get_parallel_predictor
+from app.services.prediction_cache import get_prediction_cache
+
 # MLflow 관련
 try:
     import mlflow
@@ -271,6 +276,9 @@ class ModelServingService:
             use_mlflow=use_mlflow
         )
         
+        # 캐시 초기화
+        self.cache = get_prediction_cache()
+        
         # 초기 모델 로드
         try:
             logger.info("모델 로드 시도 중...")
@@ -304,14 +312,26 @@ class ModelServingService:
         Returns:
             예측 결과
         """
+        # 모델 정보
+        model_info = self.model_loader.get_model_info()
+        
+        # 캐시 조회
+        cached_result = self.cache.get(features, model_info.version, return_probabilities)
+        if cached_result:
+            logger.debug("캐시된 예측 결과 반환")
+            return PredictionOutput(**cached_result)
+        
         start_time = datetime.now()
         
         try:
             # 모델 로드
             model = self.model_loader.load_model()
             
-            # 예측
-            features_array = np.array(features).reshape(1, -1)
+            # 성능 최적화: float32 사용, C-contiguous 배열
+            optimizer = get_optimizer()
+            features_array = optimizer.optimize_array([features], dtype=np.float32)
+            
+            # 예측 (최적화된 배열 사용)
             prediction = model.predict(features_array)[0]
             
             # 확률 계산 (분류 모델인 경우)
@@ -326,10 +346,7 @@ class ModelServingService:
             # 추론 시간 계산
             inference_time = (datetime.now() - start_time).total_seconds() * 1000
             
-            # 모델 정보
-            model_info = self.model_loader.get_model_info()
-            
-            return PredictionOutput(
+            result = PredictionOutput(
                 prediction=int(prediction) if isinstance(prediction, (np.integer, int)) else float(prediction),
                 probability=probability,
                 probabilities=probabilities,
@@ -338,6 +355,11 @@ class ModelServingService:
                 inference_time_ms=round(inference_time, 2)
             )
             
+            # 캐시에 저장
+            self.cache.set(features, model_info.version, return_probabilities, result.dict())
+            
+            return result
+            
         except Exception as e:
             logger.error(f"예측 실패: {e}", exc_info=True)
             raise
@@ -345,7 +367,9 @@ class ModelServingService:
     async def predict_batch(
         self,
         batch_features: List[List[float]],
-        return_probabilities: bool = True
+        return_probabilities: bool = True,
+        use_parallel: bool = False,
+        chunk_size: int = 100
     ) -> List[PredictionOutput]:
         """
         배치 예측
@@ -353,6 +377,8 @@ class ModelServingService:
         Args:
             batch_features: 특성 벡터 배치
             return_probabilities: 확률 반환 여부
+            use_parallel: 병렬 처리 사용 여부
+            chunk_size: 병렬 처리 시 청크 크기
             
         Returns:
             예측 결과 리스트
@@ -362,37 +388,65 @@ class ModelServingService:
         try:
             # 모델 로드
             model = self.model_loader.load_model()
-            
-            # 배치 예측
-            features_array = np.array(batch_features)
-            predictions = model.predict(features_array)
-            
-            # 확률 계산
-            probabilities_batch = None
-            if return_probabilities and hasattr(model, 'predict_proba'):
-                probabilities_batch = model.predict_proba(features_array)
-            
-            # 결과 생성
-            results = []
             model_info = self.model_loader.get_model_info()
             
-            for i, prediction in enumerate(predictions):
-                probability = None
-                probabilities = None
+            # 병렬 처리 활성화 시
+            if use_parallel and len(batch_features) > chunk_size:
+                logger.info(f"병렬 배치 예측 시작: {len(batch_features)}개 샘플")
                 
-                if probabilities_batch is not None:
-                    proba = probabilities_batch[i]
-                    probabilities = proba.tolist()
-                    probability = float(proba[int(prediction)])
+                parallel_predictor = get_parallel_predictor()
+                predictions_data = parallel_predictor.predict_parallel(
+                    model=model,
+                    batch_features=batch_features,
+                    chunk_size=chunk_size,
+                    return_probabilities=return_probabilities
+                )
                 
-                results.append(PredictionOutput(
-                    prediction=int(prediction) if isinstance(prediction, (np.integer, int)) else float(prediction),
-                    probability=probability,
-                    probabilities=probabilities,
-                    model_version=model_info.version,
-                    timestamp=datetime.now().isoformat(),
-                    inference_time_ms=0.0  # 개별 시간은 측정하지 않음
-                ))
+                # 결과 변환
+                results = []
+                for pred_data in predictions_data:
+                    results.append(PredictionOutput(
+                        prediction=pred_data["prediction"],
+                        probability=pred_data.get("probability"),
+                        probabilities=pred_data.get("probabilities"),
+                        model_version=model_info.version,
+                        timestamp=datetime.now().isoformat(),
+                        inference_time_ms=0.0
+                    ))
+            else:
+                # 순차 처리
+                # 성능 최적화: float32 사용, C-contiguous 배열
+                optimizer = get_optimizer()
+                features_array = optimizer.optimize_array(batch_features, dtype=np.float32)
+                
+                # 배치 예측 (최적화된 배열 사용)
+                predictions = model.predict(features_array)
+                
+                # 확률 계산
+                probabilities_batch = None
+                if return_probabilities and hasattr(model, 'predict_proba'):
+                    probabilities_batch = model.predict_proba(features_array)
+                
+                # 결과 생성 (벡터화)
+                results = []
+                
+                for i, prediction in enumerate(predictions):
+                    probability = None
+                    probabilities = None
+                    
+                    if probabilities_batch is not None:
+                        proba = probabilities_batch[i]
+                        probabilities = proba.tolist()
+                        probability = float(proba[int(prediction)])
+                    
+                    results.append(PredictionOutput(
+                        prediction=int(prediction) if isinstance(prediction, (np.integer, int)) else float(prediction),
+                        probability=probability,
+                        probabilities=probabilities,
+                        model_version=model_info.version,
+                        timestamp=datetime.now().isoformat(),
+                        inference_time_ms=0.0  # 개별 시간은 측정하지 않음
+                    ))
             
             # 전체 추론 시간 계산
             total_inference_time = (datetime.now() - start_time).total_seconds() * 1000
