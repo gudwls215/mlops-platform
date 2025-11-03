@@ -65,7 +65,7 @@ interface Resume {
 const HybridRecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep, currentStep } = useAppContext();
+  const { currentResume, setCurrentResume: setContextCurrentResume, setSelectedJob: setContextSelectedJob, setGeneratedCoverLetter: setContextGeneratedCoverLetter, setCurrentStep, currentStep } = useAppContext();
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [resumeList, setResumeList] = useState<Resume[]>([]);
   const [topN, setTopN] = useState<number>(10);
@@ -209,6 +209,17 @@ const HybridRecommendationPage: React.FC = () => {
         `http://192.168.0.147:9000/api/v1/resume/${resumeId}`
       );
       
+      // Context에 이력서 저장
+      const resumeData = resumeResponse.data.data;
+      setContextCurrentResume({
+        id: resumeData.id,
+        title: resumeData.title || '이력서',
+        content: resumeData.content,
+        skills: [], // 필요시 추출
+        created_at: resumeData.created_at,
+        updated_at: resumeData.updated_at,
+      });
+      
       // 2. 채용공고 데이터 조회
       const jobResponse = await axios.get(
         `http://192.168.0.147:9000/api/v1/job/${job.job_id}`
@@ -216,12 +227,27 @@ const HybridRecommendationPage: React.FC = () => {
 
       // 3. 자기소개서 생성 API 호출
       const formData = new FormData();
-      formData.append('resume_data', resumeResponse.data.data?.content || '{}');
+      
+      // resume_data를 JSON 문자열로 변환
+      const resumeContent = resumeResponse.data.data?.content;
+      let resumeJson: any = {};
+      try {
+        // content가 이미 JSON 문자열인 경우
+        resumeJson = typeof resumeContent === 'string' 
+          ? JSON.parse(resumeContent)
+          : resumeContent || {};
+      } catch (e) {
+        console.warn('Resume content parsing error:', e);
+        resumeJson = { content: resumeContent };
+      }
+      
+      formData.append('resume_data', JSON.stringify(resumeJson));
       formData.append('job_posting_data', JSON.stringify({
-        title: jobResponse.data.data?.title || job.title,
         company: jobResponse.data.data?.company || job.company,
-        description: jobResponse.data.data?.description || '',
-        requirements: jobResponse.data.data?.requirements || '',
+        job_title: jobResponse.data.data?.title || job.title,
+        job_description: jobResponse.data.data?.description || '',
+        qualifications: jobResponse.data.data?.requirements || '',
+        preferred_qualifications: jobResponse.data.data?.preferred_qualifications || '',
       }));
       formData.append('tone', 'professional');
 
@@ -231,10 +257,18 @@ const HybridRecommendationPage: React.FC = () => {
       );
 
       const coverLetterContent = coverLetterResponse.data.content || coverLetterResponse.data.data?.content || '자기소개서 생성 완료';
-      setGeneratedCoverLetter(coverLetterContent);
+      const note = coverLetterResponse.data.note;
       
-      // Context에 자기소개서와 선택된 채용공고 저장
-      setContextGeneratedCoverLetter(coverLetterContent);
+      // 템플릿 기반 생성인 경우 안내 메시지 추가
+      let displayContent = coverLetterContent;
+      if (note && note.includes('템플릿')) {
+        displayContent = `[안내] AI API 사용량 제한으로 템플릿 기반으로 생성되었습니다.\n아래 내용을 참고하여 수정하시기 바랍니다.\n\n${'='.repeat(50)}\n\n${coverLetterContent}`;
+      }
+      
+      setGeneratedCoverLetter(displayContent);
+      
+      // Context에 자기소개서와 선택된 채용공고 저장 (displayContent로 저장하여 안내 메시지 포함)
+      setContextGeneratedCoverLetter(displayContent);
       setContextSelectedJob({
         id: job.job_id,
         title: job.title,
@@ -249,8 +283,21 @@ const HybridRecommendationPage: React.FC = () => {
       
     } catch (err: any) {
       console.error('자기소개서 생성 오류:', err);
-      setError(err.response?.data?.error || err.response?.data?.detail || '자기소개서 생성 중 오류가 발생했습니다.');
-      setGeneratedCoverLetter('자기소개서 생성에 실패했습니다. 다시 시도해주세요.');
+      console.error('Error response:', err.response);
+      console.error('Error data:', err.response?.data);
+      
+      let errorMessage = '자기소개서 생성 중 오류가 발생했습니다.';
+      
+      if (err.response?.data?.detail) {
+        errorMessage = `오류: ${err.response.data.detail}`;
+      } else if (err.response?.data?.error) {
+        errorMessage = `오류: ${err.response.data.error}`;
+      } else if (err.message) {
+        errorMessage = `오류: ${err.message}`;
+      }
+      
+      setError(errorMessage);
+      setGeneratedCoverLetter(`자기소개서 생성에 실패했습니다.\n\n${errorMessage}\n\n다시 시도해주세요.`);
     } finally {
       setGeneratingCoverLetter(false);
     }
@@ -277,6 +324,15 @@ const HybridRecommendationPage: React.FC = () => {
   };
 
   const handleGoToSummary = () => {
+    console.log('=== handleGoToSummary 호출 ===');
+    console.log('currentResume:', currentResume ? '있음' : '없음');
+    console.log('selectedJob:', selectedJob ? '있음' : '없음');
+    console.log('generatedCoverLetter:', generatedCoverLetter ? '있음' : '없음');
+    console.log('localStorage check:');
+    console.log('  resume:', localStorage.getItem('mlops_current_resume') ? '있음' : '없음');
+    console.log('  job:', localStorage.getItem('mlops_selected_job') ? '있음' : '없음');
+    console.log('  coverLetter:', localStorage.getItem('mlops_cover_letter') ? '있음' : '없음');
+    
     navigate('/summary');
   };
 
@@ -726,6 +782,19 @@ const HybridRecommendationPage: React.FC = () => {
                   아래 자기소개서를 확인하고 다운로드하세요.
                 </Typography>
               </Alert>
+
+              {/* 템플릿 기반 생성 안내 */}
+              {generatedCoverLetter.includes('[안내]') && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>📝 안내</strong>
+                    <br />
+                    AI API 사용량 제한으로 인해 템플릿 기반으로 생성되었습니다.
+                    <br />
+                    자기소개서 내용을 확인하시고 필요한 부분을 수정하여 사용하시기 바랍니다.
+                  </Typography>
+                </Alert>
+              )}
 
               <Paper sx={{ p: 3, bgcolor: '#f5f5f5' }}>
                 <Typography

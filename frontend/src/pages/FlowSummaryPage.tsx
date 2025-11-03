@@ -36,8 +36,16 @@ const FlowSummaryPage: React.FC = () => {
 
   // 데이터가 없으면 시작 페이지로 리다이렉트
   React.useEffect(() => {
+    console.log('=== FlowSummaryPage useEffect ===');
+    console.log('currentResume:', currentResume ? '있음' : '없음');
+    console.log('selectedJob:', selectedJob ? '있음' : '없음');
+    console.log('generatedCoverLetter:', generatedCoverLetter ? '있음' : '없음');
+    
     if (!currentResume || !selectedJob || !generatedCoverLetter) {
+      console.warn('데이터 누락으로 /resume/create로 리다이렉트합니다.');
       navigate('/resume/create');
+    } else {
+      console.log('모든 데이터 확인 완료. 페이지를 표시합니다.');
     }
   }, [currentResume, selectedJob, generatedCoverLetter, navigate]);
 
