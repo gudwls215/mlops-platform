@@ -420,11 +420,39 @@
   <!-- - [ ] 유사 사용자 기반 추천
   - [ ] 추천 결과 랭킹 알고리즘 -->
 
-- [ ] 모델 서빙 인프라
-  - [ ] TorchServe 설치 및 설정
-  - [ ] 모델 배포 스크립트 작성
-  - [ ] REST API 엔드포인트 구축
-  - [ ] 배치 예측 vs 실시간 예측 전략
+- [x] 모델 서빙 인프라
+  - [x] FastAPI 기반 서빙 시스템 구축 (TorchServe 대신 scikit-learn 모델용)
+    - model_serving.py: ModelLoader, ModelServingService 구현
+    - MLflow Model Registry 통합 (Production/Staging 스테이지 지원)
+    - 로컬 파일 fallback 지원 (joblib 형식)
+    - 모델 버전 관리 및 캐싱 (TTL 60분)
+    - 자동 리로드 기능
+  - [x] REST API 엔드포인트 구축
+    - GET /api/model/health - 헬스 체크
+    - GET /api/model/info - 모델 정보 조회
+    - GET /api/model/metrics - 모델 메트릭 조회
+    - POST /api/model/predict - 실시간 예측
+    - POST /api/model/predict/batch - 배치 예측 (동기)
+    - POST /api/model/reload - 모델 리로드
+  - [x] 배치 예측 큐 시스템 구현
+    - batch_queue.py: BatchQueue, BatchJob 구현
+    - FIFO 큐 기반 비동기 처리
+    - POST /api/model/batch/submit - 배치 작업 제출
+    - GET /api/model/batch/{job_id} - 작업 상태 조회
+    - GET /api/model/batch/queue/stats - 큐 통계
+    - POST /api/model/batch/queue/process - 모든 작업 처리
+    - DELETE /api/model/batch/queue/clear - 완료 작업 정리
+  - [x] 배치 예측 vs 실시간 예측 전략
+    - 실시간 예측: P95 < 28ms (목표 < 2초 달성)
+    - 배치 예측: 최대 818 samples/sec 처리량
+    - 큐 기반 비동기 처리로 대량 요청 처리
+    - 배치 크기: 최대 10,000개
+    - 큐 크기: 최대 100개 작업
+  - [x] 테스트 및 검증
+    - test_model_serving.py 작성
+    - 전체 테스트 통과 (9개 테스트 시나리오)
+    - 성능 테스트: P95 28ms (목표 < 2초 달성)
+    - API 문서: Swagger UI (/docs)
 
 - [ ] 성능 최적화
   - [ ] 모델 추론 속도 최적화

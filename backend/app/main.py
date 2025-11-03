@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import resume, job_posting, speech, cover_letter, matching
+from app.routers import resume, job_posting, speech, cover_letter, matching, model_serving
 from app.api import feedback, monitoring
 from app.middleware.usage_monitoring import UsageMonitoringMiddleware
 from app.core.config import settings
@@ -40,6 +40,7 @@ app.include_router(monitoring.router, tags=["monitoring"])
 app.include_router(labeling.router, tags=["labeling"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(hybrid_recommendations.router, tags=["hybrid-recommendations"])
+app.include_router(model_serving.router, tags=["model-serving"])
 
 @app.get("/")
 async def root():
