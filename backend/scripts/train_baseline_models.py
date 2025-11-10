@@ -10,6 +10,17 @@ import sys
 import os
 from pathlib import Path
 
+# 환경 변수 로드 (다른 모듈 임포트보다 먼저)
+from dotenv import load_dotenv
+load_dotenv()
+
+# MLflow URI 환경 변수 설정 (mlflow_config 임포트 전에)
+os.environ["MLFLOW_TRACKING_URI"] = "http://192.168.0.147:5001"
+
+# MLFLOW_BACKEND_STORE_URI 제거 (HTTP tracking URI 사용 강제)
+if "MLFLOW_BACKEND_STORE_URI" in os.environ:
+    del os.environ["MLFLOW_BACKEND_STORE_URI"]
+
 # 프로젝트 루트 경로 추가
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -23,20 +34,17 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, 
     roc_auc_score, confusion_matrix, classification_report
 )
-from dotenv import load_dotenv
 import joblib
 import json
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# MLflow import
+# MLflow import (환경 변수 설정 후)
 import mlflow
 import mlflow.sklearn
 from app.mlflow_config import get_or_create_experiment, MLFLOW_TRACKING_URI
-
-# 환경 변수 로드
-load_dotenv()
+from app.services.experiment_tracking import ExperimentTracker
 
 # MLflow logged-models API 비활성화
 os.environ["MLFLOW_ENABLE_LOGGED_MODEL_CREATION"] = "false"
@@ -44,6 +52,10 @@ os.environ["MLFLOW_ENABLE_LOGGED_MODEL_CREATION"] = "false"
 # MLflow 설정
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 print(f"MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
+print(f"MLflow actual tracking URI: {mlflow.get_tracking_uri()}")
+
+# ExperimentTracker 초기화
+experiment_tracker = ExperimentTracker()
 
 # 데이터베이스 연결 설정
 DB_HOST = os.getenv('POSTGRES_HOST', '114.202.2.226')
@@ -300,15 +312,37 @@ class BaselineModelTrainer:
         print(f"\n평가 결과 저장 완료: {results_path}")
     
     def run(self):
-        """전체 프로세스 실행 (MLflow 연동)"""
+        """전체 프로세스 실행 (ExperimentTracker 사용)"""
         print("="*60)
-        print("베이스라인 모델 학습 시작 (MLflow 연동)")
+        print("베이스라인 모델 학습 시작 (ExperimentTracker 사용)")
         print("="*60)
         
         start_time = datetime.now()
         
-        # MLflow 실험 설정
-        experiment_id = get_or_create_experiment()
+        # MLflow 실험 설정 (ExperimentTracker 사용)
+        experiment_name = "baseline-models-2025"
+        
+        # 디버깅 정보
+        print(f"Current directory: {os.getcwd()}")
+        print(f"MLflow tracking URI from mlflow: {mlflow.get_tracking_uri()}")
+        print(f"MLflow tracking URI from ExperimentTracker: {experiment_tracker.tracking_uri}")
+        
+        experiment_id = experiment_tracker.create_experiment(
+            name=experiment_name,
+            tags={
+                "project": "mlops-platform",
+                "phase": "baseline",
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        )
+        print(f"실험 ID: {experiment_id}")
+        
+        # 실험 확인 (디버깅)
+        try:
+            exp = mlflow.get_experiment(experiment_id)
+            print(f"실험 확인: {exp.name}, artifact_location: {exp.artifact_location}")
+        except Exception as e:
+            print(f"실험 확인 실패: {e}")
         
         try:
             # 1. 데이터 로드
@@ -330,76 +364,105 @@ class BaselineModelTrainer:
                 'train_positive_ratio': float(y_train.sum() / len(y_train))
             }
             
-            # 2. 로지스틱 회귀 학습 및 평가 (MLflow Run)
+            # 2. 로지스틱 회귀 학습 및 평가 (ExperimentTracker)
             print("\n[2단계] 로지스틱 회귀 모델")
-            with mlflow.start_run(experiment_id=experiment_id, run_name="Logistic_Regression_Baseline") as run:
-                # 태그 설정
-                mlflow.set_tag("model_type", "logistic_regression")
-                mlflow.set_tag("phase", "baseline")
-                mlflow.set_tag("framework", "scikit-learn")
-                
+            
+            # Run 시작
+            lr_run_id = experiment_tracker.start_run(
+                experiment_id=experiment_id,
+                run_name="Logistic_Regression_Baseline",
+                tags={
+                    "model_type": "logistic_regression",
+                    "phase": "baseline",
+                    "framework": "scikit-learn"
+                }
+            )
+            
+            try:
                 # 데이터 정보 로깅
-                mlflow.log_params(data_info)
+                experiment_tracker.log_params(lr_run_id, data_info)
                 
                 # 모델 학습
-                lr_model = self.train_logistic_regression(X_train, y_train, mlflow_run=run)
-                
-                # 평가
-                lr_train_results = self.evaluate_model(lr_model, X_train, y_train, 'Train', mlflow_run=run)
-                lr_val_results = self.evaluate_model(lr_model, X_val, y_val, 'Validation', mlflow_run=run)
-                lr_test_results = self.evaluate_model(lr_model, X_test, y_test, 'Test', mlflow_run=run)
-                
-                # 모델 저장 (MLflow)
-                mlflow.sklearn.log_model(
-                    sk_model=lr_model,
-                    artifact_path="model",
-                    registered_model_name="LogisticRegression_CoverLetter"
-                )
+                with mlflow.start_run(run_id=lr_run_id):
+                    lr_model = self.train_logistic_regression(X_train, y_train, mlflow_run=True)
+                    
+                    # 평가
+                    lr_train_results = self.evaluate_model(lr_model, X_train, y_train, 'Train', mlflow_run=True)
+                    lr_val_results = self.evaluate_model(lr_model, X_val, y_val, 'Validation', mlflow_run=True)
+                    lr_test_results = self.evaluate_model(lr_model, X_test, y_test, 'Test', mlflow_run=True)
+                    
+                    # 모델 저장 (ExperimentTracker)
+                    experiment_tracker.log_model(
+                        run_id=lr_run_id,
+                        model=lr_model,
+                        artifact_path="model",
+                        registered_model_name="LogisticRegression_CoverLetter"
+                    )
                 
                 self.results['logistic_regression'] = {
                     'train': lr_train_results,
                     'validation': lr_val_results,
                     'test': lr_test_results,
-                    'mlflow_run_id': run.info.run_id
+                    'mlflow_run_id': lr_run_id
                 }
                 
-                print(f"\nMLflow Run ID: {run.info.run_id}")
+                print(f"\nMLflow Run ID: {lr_run_id}")
+                
+            except Exception as e:
+                print(f"로지스틱 회귀 학습 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
             
             self.save_model('logistic_regression')
             
-            # 3. Random Forest 학습 및 평가 (MLflow Run)
+            # 3. Random Forest 학습 및 평가 (ExperimentTracker)
             print("\n[3단계] Random Forest 모델")
-            with mlflow.start_run(experiment_id=experiment_id, run_name="RandomForest_Baseline") as run:
-                # 태그 설정
-                mlflow.set_tag("model_type", "random_forest")
-                mlflow.set_tag("phase", "baseline")
-                mlflow.set_tag("framework", "scikit-learn")
-                
+            
+            # Run 시작
+            rf_run_id = experiment_tracker.start_run(
+                experiment_id=experiment_id,
+                run_name="RandomForest_Baseline",
+                tags={
+                    "model_type": "random_forest",
+                    "phase": "baseline",
+                    "framework": "scikit-learn"
+                }
+            )
+            
+            try:
                 # 데이터 정보 로깅
-                mlflow.log_params(data_info)
+                experiment_tracker.log_params(rf_run_id, data_info)
                 
                 # 모델 학습
-                rf_model = self.train_random_forest(X_train, y_train, mlflow_run=run)
-                
-                # 평가
-                rf_train_results = self.evaluate_model(rf_model, X_train, y_train, 'Train', mlflow_run=run)
-                rf_val_results = self.evaluate_model(rf_model, X_val, y_val, 'Validation', mlflow_run=run)
-                rf_test_results = self.evaluate_model(rf_model, X_test, y_test, 'Test', mlflow_run=run)
-                
-                # 모델 저장 (MLflow)
-                mlflow.sklearn.log_model(
-                    sk_model=rf_model,
-                    artifact_path="model"
-                )
+                with mlflow.start_run(run_id=rf_run_id):
+                    rf_model = self.train_random_forest(X_train, y_train, mlflow_run=True)
+                    
+                    # 평가
+                    rf_train_results = self.evaluate_model(rf_model, X_train, y_train, 'Train', mlflow_run=True)
+                    rf_val_results = self.evaluate_model(rf_model, X_val, y_val, 'Validation', mlflow_run=True)
+                    rf_test_results = self.evaluate_model(rf_model, X_test, y_test, 'Test', mlflow_run=True)
+                    
+                    # 모델 저장 (ExperimentTracker)
+                    experiment_tracker.log_model(
+                        run_id=rf_run_id,
+                        model=rf_model,
+                        artifact_path="model",
+                        registered_model_name="RandomForest_CoverLetter"
+                    )
                 
                 self.results['random_forest'] = {
                     'train': rf_train_results,
                     'validation': rf_val_results,
                     'test': rf_test_results,
-                    'mlflow_run_id': run.info.run_id
+                    'mlflow_run_id': rf_run_id
                 }
                 
-                print(f"\nMLflow Run ID: {run.info.run_id}")
+                print(f"\nMLflow Run ID: {rf_run_id}")
+                
+            except Exception as e:
+                print(f"Random Forest 학습 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
             
             self.save_model('random_forest')
             
@@ -416,15 +479,65 @@ class BaselineModelTrainer:
             print(f"{'Logistic Regression':<20} {lr_test_results['accuracy']:<10.4f} {lr_test_results['f1_score']:<10.4f} {lr_test_results['roc_auc']:<10.4f}")
             print(f"{'Random Forest':<20} {rf_test_results['accuracy']:<10.4f} {rf_test_results['f1_score']:<10.4f} {rf_test_results['roc_auc']:<10.4f}")
             
-            # 최고 성능 모델
-            if lr_test_results['f1_score'] > rf_test_results['f1_score']:
-                best_model = 'Logistic Regression'
-                best_f1 = lr_test_results['f1_score']
-            else:
-                best_model = 'Random Forest'
-                best_f1 = rf_test_results['f1_score']
+            # 최고 성능 모델 찾기 (ExperimentTracker 사용)
+            print("\n[6단계] 최고 성능 모델 선택")
+            best_run = experiment_tracker.get_best_run(
+                experiment_id=experiment_id,
+                metric_key="test_f1_score",
+                ascending=False
+            )
             
-            print(f"\n최고 성능 모델: {best_model} (F1 Score: {best_f1:.4f})")
+            if best_run:
+                best_model_name = best_run.get('tags', {}).get('model_type', 'Unknown')
+                best_f1 = best_run.get('metrics', {}).get('test_f1_score', 0)
+                print(f"✓ 최고 성능 모델: {best_model_name} (F1 Score: {best_f1:.4f})")
+                print(f"  Run ID: {best_run['run_id']}")
+                
+                # Production 스테이지로 승격
+                try:
+                    if best_model_name == 'logistic_regression':
+                        model_name = "LogisticRegression_CoverLetter"
+                    else:
+                        model_name = "RandomForest_CoverLetter"
+                    
+                    # 모델 레지스트리에서 최신 버전 조회 (max_results 명시)
+                    model_versions = mlflow.search_registered_models(
+                        filter_string=f"name='{model_name}'",
+                        max_results=100
+                    )
+                    if model_versions and len(model_versions) > 0:
+                        latest_versions = model_versions[0].latest_versions
+                        if latest_versions and len(latest_versions) > 0:
+                            # 버전을 안전하게 정수로 변환
+                            version_numbers = []
+                            for v in latest_versions:
+                                try:
+                                    version_numbers.append(int(str(v.version)))
+                                except (ValueError, AttributeError):
+                                    continue
+                            
+                            if version_numbers:
+                                latest_version = max(version_numbers)
+                                
+                                # Production으로 승격
+                                experiment_tracker.transition_model_stage(
+                                    model_name=model_name,
+                                    version=str(latest_version),
+                                    stage="Production",
+                                    archive_existing_versions=True
+                                )
+                                print(f"✓ 모델 {model_name} v{latest_version}을 Production으로 승격했습니다.")
+                            else:
+                                print(f"  경고: {model_name} 모델 버전을 찾을 수 없습니다.")
+                        else:
+                            print(f"  경고: {model_name} 모델이 등록되어 있지만 버전이 없습니다.")
+                    else:
+                        print(f"  경고: {model_name} 모델이 Model Registry에 등록되지 않았습니다.")
+                        print(f"  (권한 문제로 인해 모델이 MLflow에 저장되지 않았을 수 있습니다)")
+                except Exception as e:
+                    print(f"  모델 승격 중 오류 (무시): {e}")
+                    import traceback
+                    traceback.print_exc()
             
             end_time = datetime.now()
             elapsed = (end_time - start_time).total_seconds()
@@ -432,6 +545,7 @@ class BaselineModelTrainer:
             print("\n" + "="*60)
             print(f"베이스라인 모델 학습 완료 (소요 시간: {elapsed:.2f}초)")
             print(f"MLflow UI: {MLFLOW_TRACKING_URI}")
+            print(f"실험 ID: {experiment_id}")
             print("="*60)
             
         except Exception as e:
@@ -443,3 +557,4 @@ class BaselineModelTrainer:
 if __name__ == "__main__":
     trainer = BaselineModelTrainer()
     trainer.run()
+ 

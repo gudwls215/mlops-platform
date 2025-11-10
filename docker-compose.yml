@@ -48,14 +48,14 @@ services:
     ports:
       - "9000:9000"
     environment:
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
-      - DATABASE_SCHEMA=mlops
-      - DATABASE_USER=postgres
-      - DATABASE_PASSWORD=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      DATABASE_HOST: "114.202.2.226"
+      DATABASE_PORT: "5433"
+      DATABASE_NAME: "postgres"
+      DATABASE_SCHEMA: "mlops"
+      DATABASE_USER: "postgres"
+      DATABASE_PASSWORD: "xlxldpa!@#"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
     volumes:
       - ./backend/app:/app/app
       - ./backend/logs:/app/logs
@@ -90,25 +90,21 @@ services:
     image: python:3.10-slim
     container_name: mlops-mlflow
     ports:
-      - "5000:5000"
+      - "5001:8080"
     environment:
-      - MLFLOW_BACKEND_STORE_URI=postgresql://postgres:postgres@postgres:5432/postgres
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
       - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
-      - ./ml/mlflow:/mlflow
-      - mlflow_artifacts:/mlflow/artifacts
+      - ./mlflow:/mlflow
+      - ./mlflow/artifacts:/mlflow/artifacts
+      - ./supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
     command: >
       bash -c "
-        pip install mlflow psycopg2-binary &&
-        mlflow server 
-        --backend-store-uri postgresql://postgres:postgres@postgres:5432/postgres
-        --default-artifact-root /mlflow/artifacts
-        --host 0.0.0.0
-        --port 5000
+        apt-get update -qq && apt-get install -y -qq socat supervisor &&
+        pip install --no-cache-dir mlflow==2.17.2 psycopg2-binary &&
+        mkdir -p /var/log/supervisor &&
+        /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
       "
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - mlops-network
     restart: unless-stopped

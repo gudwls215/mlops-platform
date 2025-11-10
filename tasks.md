@@ -492,17 +492,70 @@
     - load_model_from_registry(): 모델 레지스트리에서 로드
     - get_best_run(): 최고 성능 run 찾기
 
-- [ ] 실험 추적 시스템 구축
-  - [ ] 모델 학습 코드에 MLflow 연동
-  - [ ] 하이퍼파라미터 로깅
-  - [ ] 메트릭 로깅 (정확도, 손실 등)
-  - [ ] 모델 아티팩트 저장
+- [x] 실험 추적 시스템 구축
+  - [x] 실험 추적 서비스 구현 (experiment_tracking.py)
+    - ExperimentTracker 클래스: 실험/Run 관리 핵심 로직
+    - create_experiment(): 실험 생성 및 조회
+    - start_run(): Run 시작 및 관리
+    - log_params(): 하이퍼파라미터 로깅 (JSON 지원)
+    - log_metrics(): 메트릭 로깅 (스텝별 기록)
+    - log_artifact(): 아티팩트(파일) 로깅
+    - log_model(): scikit-learn 모델 로깅 및 레지스트리 등록
+    - search_runs(): 조건 기반 Run 검색 (필터링, 정렬)
+    - compare_runs(): 여러 Run 비교 (DataFrame 반환)
+    - get_best_run(): 메트릭 기준 최고 성능 Run 찾기
+  - [x] 실험 관리 API 엔드포인트 구현 (experiments.py)
+    - POST /api/experiments/create - 실험 생성
+    - GET /api/experiments/{experiment_id} - 실험 조회
+    - GET /api/experiments/ - 실험 목록 (view_type 필터)
+    - DELETE /api/experiments/{experiment_id} - 실험 삭제
+    - POST /api/experiments/runs/start - Run 시작
+    - GET /api/experiments/runs/{run_id} - Run 조회
+    - POST /api/experiments/runs/search - Run 검색
+    - DELETE /api/experiments/runs/{run_id} - Run 삭제
+    - POST /api/experiments/runs/log-params - 파라미터 로깅
+    - POST /api/experiments/runs/log-metrics - 메트릭 로깅
+    - POST /api/experiments/runs/compare - Run 비교
+    - GET /api/experiments/runs/best/{experiment_id} - 최고 성능 Run
+    - GET /api/experiments/stats/{experiment_id} - 실험 통계
+  - [x] 모델 레지스트리 연동
+    - POST /api/experiments/models/register - 모델 등록
+    - POST /api/experiments/models/transition-stage - 스테이지 변경
+    - GET /api/experiments/models/{model_name} - 모델 버전 조회
+  - [x] 실험 비교 유틸리티 구현 (experiment_comparator.py)
+    - ExperimentComparator 클래스: 실험 분석 도구
+    - compare_experiments(): 여러 실험 통합 비교
+    - get_best_models(): 상위 K개 모델 추출
+    - analyze_hyperparameters(): 하이퍼파라미터 영향 분석
+    - plot_metric_comparison(): 메트릭 비교 시각화
+    - plot_hyperparameter_impact(): 파라미터 영향 시각화
+    - generate_report(): 마크다운 리포트 생성
+  - [x] 기존 학습 코드에 MLflow 연동 (train_baseline_models.py)
+    - 이미 MLflow 로깅 구현되어 있음 확인
+    - 하이퍼파라미터, 메트릭, 모델 아티팩트 자동 저장
+  - [x] 종합 테스트 (test_experiment_tracking.py)
+    - 11개 테스트 시나리오 작성
+    - 모든 테스트 통과 (11/11 PASS)
+    - 소요 시간: 4.27초
+    - 테스트 항목:
+      * 서버 상태 확인
+      * 실험 목록 조회
+      * 실험 생성
+      * Run 시작 (2개)
+      * 파라미터 로깅
+      * 메트릭 로깅 (스텝별)
+      * Run 조회
+      * Run 검색
+      * Run 비교
+      * 최고 성능 Run 조회
+      * 실험 통계 조회
 
-- [ ] Model Registry 구성
-  - [ ] 모델 등록 자동화
-  - [ ] 모델 버전 관리
-  - [ ] Staging/Production 단계 설정
-  - [ ] 모델 승격 기준 정의
+- [x] Model Registry 구성
+  - [x] 모델 등록 자동화 (register_model())
+  - [x] 모델 버전 관리 (get_model_version())
+  - [x] Staging/Production 단계 설정 (transition_model_stage())
+  - [x] 모델 승격 기준 정의 (메트릭 기반 최고 성능 모델)
+  - [x] API 엔드포인트 구현 완료
 
 - [ ] Airflow에서 MLflow 연동
   - [ ] 모델 학습 DAG 작성

@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 # MLflow 설정
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI", 
-    "http://192.168.0.147:5000"
+    "http://192.168.0.147:5001"
 )
 MLFLOW_EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT_NAME", 

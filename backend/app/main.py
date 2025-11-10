@@ -1,15 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import resume, job_posting, speech, cover_letter, matching, model_serving
+from app.routers import (
+    resume, job_posting, speech, cover_letter, matching, 
+    model_serving, experiments, labeling, recommendations, 
+    hybrid_recommendations
+)
 from app.api import feedback, monitoring
 from app.middleware.usage_monitoring import UsageMonitoringMiddleware
 from app.core.config import settings
-
-# routers 패키지에서 labeling, recommendations, hybrid_recommendations 임포트
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from routers import labeling, recommendations, hybrid_recommendations
 
 app = FastAPI(
     title="장년층 이력서 생성 도우미 API",
@@ -41,6 +39,7 @@ app.include_router(labeling.router, tags=["labeling"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(hybrid_recommendations.router, tags=["hybrid-recommendations"])
 app.include_router(model_serving.router, tags=["model-serving"])
+app.include_router(experiments.router, tags=["experiments"])
 
 @app.get("/")
 async def root():

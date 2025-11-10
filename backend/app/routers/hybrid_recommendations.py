@@ -16,6 +16,8 @@ from sqlalchemy import create_engine, text
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 import joblib
+import mlflow
+import mlflow.sklearn
 
 # 환경 변수 로드
 load_dotenv()
@@ -41,11 +43,11 @@ except ImportError:
 router = APIRouter(prefix="/api/hybrid-recommendations", tags=["hybrid-recommendations"])
 
 # 데이터베이스 연결 설정
-DB_HOST = os.getenv('POSTGRES_HOST', '114.202.2.226')
-DB_PORT = os.getenv('POSTGRES_PORT', '5433')
-DB_NAME = os.getenv('POSTGRES_DB', 'postgres')
-DB_USER = os.getenv('POSTGRES_USER', 'postgres')
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', '')
+DB_HOST = os.getenv('DATABASE_HOST', '114.202.2.226')
+DB_PORT = os.getenv('DATABASE_PORT', '5433')
+DB_NAME = os.getenv('DATABASE_NAME', 'postgres')
+DB_USER = os.getenv('DATABASE_USER', 'postgres')
+DB_PASSWORD = os.getenv('DATABASE_PASSWORD', '')
 DB_SCHEMA = 'mlops'
 
 import urllib.parse
@@ -56,6 +58,10 @@ DATABASE_URL = f"postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{
 MODEL_DIR = project_root / 'models'
 FINAL_MODEL_PATH = MODEL_DIR / 'final_model.joblib'
 
+# MLflow 설정
+MLFLOW_MODEL_NAME = "LogisticRegression_CoverLetter"  # MLflow Registry 모델 이름
+MLFLOW_MODEL_STAGE = "Production"  # 사용할 스테이지
+
 # 싱글톤 인스턴스
 _model = None
 _cf_recommender = None
@@ -63,12 +69,46 @@ _diversity_reranker = None
 
 
 def load_model():
-    """최종 모델 로드 (싱글톤)"""
+    """
+    최종 모델 로드 (싱글톤)
+    
+    우선순위:
+    1. MLflow Model Registry (Production 스테이지)
+    2. 로컬 joblib 파일 (fallback)
+    """
     global _model
     if _model is None:
-        if not FINAL_MODEL_PATH.exists():
-            raise FileNotFoundError(f"최종 모델 파일이 없습니다: {FINAL_MODEL_PATH}")
-        _model = joblib.load(FINAL_MODEL_PATH)
+        # 1. MLflow Model Registry에서 로드 시도
+        try:
+            from app.services.experiment_tracking import ExperimentTracker
+            
+            tracker = ExperimentTracker()
+            
+            # Production 스테이지 모델 조회
+            model_info = tracker.get_model_version(
+                model_name=MLFLOW_MODEL_NAME,
+                stage=MLFLOW_MODEL_STAGE
+            )
+            
+            # MLflow에서 모델 로드
+            model_uri = f"models:/{MLFLOW_MODEL_NAME}/{MLFLOW_MODEL_STAGE}"
+            _model = mlflow.sklearn.load_model(model_uri)
+            
+            print(f"✓ MLflow Model Registry에서 로드: {MLFLOW_MODEL_NAME} v{model_info['version']} ({MLFLOW_MODEL_STAGE})")
+            
+        except Exception as e:
+            print(f"MLflow 모델 로드 실패 (로컬 파일로 폴백): {e}")
+            
+            # 2. 로컬 joblib 파일에서 로드 (fallback)
+            if not FINAL_MODEL_PATH.exists():
+                raise FileNotFoundError(
+                    f"모델을 찾을 수 없습니다. "
+                    f"MLflow Registry에도 없고 로컬 파일도 없습니다: {FINAL_MODEL_PATH}"
+                )
+            
+            _model = joblib.load(FINAL_MODEL_PATH)
+            print(f"✓ 로컬 파일에서 로드: {FINAL_MODEL_PATH}")
+    
     return _model
 
 

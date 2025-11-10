@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 코드 복사
 COPY ./app /app/app
+COPY ./scripts /app/scripts
+COPY ./alembic /app/alembic
+COPY ./alembic.ini /app/alembic.ini
 
 # 로그 디렉토리 생성
 RUN mkdir -p /app/logs
