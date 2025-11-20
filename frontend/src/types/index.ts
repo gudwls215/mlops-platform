@@ -1,5 +1,7 @@
 // API 기본 설정
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.0.147:9000';
+// 현재 접속 프로토콜이 HTTPS인 경우 상대 경로 사용, HTTP인 경우 직접 IP 사용
+const isHTTPS = typeof window !== 'undefined' && window.location.protocol === 'https:';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || (isHTTPS ? '' : 'http://192.168.0.147:9000');
 
 // API 타입 정의
 export interface Resume {
@@ -30,7 +32,7 @@ export interface JobPosting {
   skills_required?: string;
   deadline?: string;
   source_url?: string;
-  created_at: string;
+  created_at: string; 
 }
 
 export interface CoverLetter {

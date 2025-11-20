@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.resume_service import get_resume_service
-from app.services.whisper_service import get_whisper_service
+# from app.services.whisper_service import get_whisper_service  # whisper 의존성 제거
 from app.services.embedding_service import generate_embedding
 from app.models import Resume
 from typing import List, Optional
@@ -286,71 +286,12 @@ async def extract_from_voice(
     db: Session = Depends(get_db)
 ):
     """
-    음성 파일로부터 이력서 데이터 추출
-    
-    Args:
-        audio_file: 음성 파일
-        language: 인식 언어
-    
-    Returns:
-        구조화된 이력서 데이터
+    음성 파일로부터 이력서 데이터 추출 (whisper 의존성으로 인해 비활성화)
     """
-    try:
-        # 1. 음성 → 텍스트 변환
-        whisper_service = get_whisper_service()
-        
-        contents = await audio_file.read()
-        from io import BytesIO
-        audio_bytes = BytesIO(contents)
-        
-        transcription_result = whisper_service.transcribe_file(
-            audio_bytes,
-            audio_file.filename,
-            language=language
-        )
-        
-        if transcription_result["status"] == "error":
-            raise HTTPException(
-                status_code=500,
-                detail=f"음성 인식 실패: {transcription_result['error']}"
-            )
-        
-        voice_text = transcription_result["text"]
-        
-        # 2. 텍스트 → 구조화된 데이터
-        resume_service = get_resume_service()
-        extraction_result = resume_service.extract_from_voice_text(voice_text)
-        
-        if extraction_result["status"] == "error":
-            raise HTTPException(
-                status_code=500,
-                detail=f"데이터 추출 실패: {extraction_result['error']}"
-            )
-        
-        # 결과 결합
-        return JSONResponse(content={
-            "status": "success",
-            "transcription": {
-                "text": voice_text,
-                "language": transcription_result["language"]
-            },
-            "resume_data": extraction_result["data"],
-            "metadata": {
-                "source": "voice",
-                "extracted_at": extraction_result["extracted_at"],
-                "total_tokens": extraction_result["tokens_used"],
-                "total_cost": extraction_result["cost"]
-            }
-        })
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Voice extraction failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"음성에서 이력서 데이터 추출 실패: {str(e)}"
-        )
+    raise HTTPException(
+        status_code=503,
+        detail="음성 인식 기능은 현재 사용할 수 없습니다. 텍스트 입력을 사용해주세요."
+    )
 
 
 @router.post("/generate-formatted")

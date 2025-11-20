@@ -28,6 +28,7 @@ import axios from 'axios';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
 import FlowStepIndicator from '../components/FlowStepIndicator';
+import { createApiUrl } from '../utils/api';
 
 interface Recommendation {
   job_id: number;
@@ -97,7 +98,7 @@ const HybridRecommendationPage: React.FC = () => {
       setLoadingResumes(true);
       try {
         const response = await axios.get(
-          `http://192.168.0.147:9000/api/v1/resume/`,
+          createApiUrl('/api/v1/resume/'),
           { params: { user_id: 1 } }
         );
         const resumes = response.data.data?.resumes || [];
@@ -170,7 +171,7 @@ const HybridRecommendationPage: React.FC = () => {
       }
       
       const response = await axios.get<RecommendationResponse>(
-        `http://192.168.0.147:9000/api/hybrid-recommendations/jobs/${id}`,
+        createApiUrl(`/api/hybrid-recommendations/jobs/${id}`),
         { params }
       );
       
@@ -206,7 +207,7 @@ const HybridRecommendationPage: React.FC = () => {
     try {
       // 1. 이력서 데이터 조회
       const resumeResponse = await axios.get(
-        `http://192.168.0.147:9000/api/v1/resume/${resumeId}`
+        createApiUrl(`/api/v1/resume/${resumeId}`)
       );
       
       // Context에 이력서 저장
@@ -222,7 +223,7 @@ const HybridRecommendationPage: React.FC = () => {
       
       // 2. 채용공고 데이터 조회
       const jobResponse = await axios.get(
-        `http://192.168.0.147:9000/api/v1/job/${job.job_id}`
+        createApiUrl(`/api/v1/job/${job.job_id}`)
       );
 
       // 3. 자기소개서 생성 API 호출
@@ -252,7 +253,7 @@ const HybridRecommendationPage: React.FC = () => {
       formData.append('tone', 'professional');
 
       const coverLetterResponse = await axios.post(
-        `http://192.168.0.147:9000/api/cover-letter/generate`,
+        createApiUrl('/api/cover-letter/generate'),
         formData
       );
 
@@ -837,3 +838,4 @@ const HybridRecommendationPage: React.FC = () => {
 };
 
 export default HybridRecommendationPage;
+console.log('API_BASE_URL:', '');

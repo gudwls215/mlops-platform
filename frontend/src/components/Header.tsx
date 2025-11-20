@@ -34,7 +34,7 @@ const Header: React.FC = () => {
         </Typography>
         
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2 }}>
-          <Button
+          {/* <Button
             color="inherit"
             startIcon={<Refresh />}
             onClick={handleNewResume}
@@ -48,7 +48,7 @@ const Header: React.FC = () => {
             }}
           >
             새 이력서
-          </Button>
+          </Button> */}
           <Button
             color="inherit"
             startIcon={<Create />}
@@ -57,14 +57,14 @@ const Header: React.FC = () => {
           >
             이력서 작성
           </Button>
-          <Button
+          {/* <Button
             color="inherit"
             startIcon={<Description />}
             onClick={() => navigate('/cover-letter')}
             sx={{ fontSize: '1rem', px: 2 }}
           >
             자기소개서
-          </Button>
+          </Button> */}
           <Button
             color="inherit"
             startIcon={<Work />}

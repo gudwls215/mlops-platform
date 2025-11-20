@@ -55,7 +55,33 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const startRecording = async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // 브라우저 지원 확인
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('이 브라우저는 음성 녹음을 지원하지 않습니다. Chrome, Firefox, Safari 최신 버전을 사용해 주세요.');
+        return;
+      }
+
+      // HTTPS 확인 (localhost는 예외)
+      const isSecure = window.location.protocol === 'https:' || 
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1';
+      
+      if (!isSecure) {
+        setError('보안 연결(HTTPS)이 필요합니다. 마이크 접근은 HTTPS에서만 가능합니다.');
+        return;
+      }
+
+      console.log('마이크 권한 요청 중...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      console.log('마이크 권한 획득 성공');
       
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -93,9 +119,24 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         });
       }, 1000);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('마이크 접근 오류:', err);
-      setError('마이크에 접근할 수 없습니다. 마이크 권한을 확인해 주세요.');
+      
+      let errorMessage = '마이크에 접근할 수 없습니다.';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해 주세요.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해 주세요.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = '마이크를 사용할 수 없습니다. 다른 프로그램에서 마이크를 사용 중일 수 있습니다.';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = '마이크 설정을 적용할 수 없습니다. 다른 마이크를 시도해 주세요.';
+      } else if (err.name === 'SecurityError') {
+        errorMessage = '보안 오류: HTTPS 연결이 필요하거나 권한이 차단되었습니다.';
+      }
+      
+      setError(errorMessage);
     }
   };
 
