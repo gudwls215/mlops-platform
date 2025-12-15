@@ -448,6 +448,22 @@ class DuplicateRemover:
                 remove_items = [item for item in items if item['id'] != keep_item['id']]
                 
                 for item in remove_items:
+                    # 1. 먼저 이 레코드를 참조하는 외래 키 관계들을 업데이트/삭제
+                    # job_recommendations의 resume_id를 keep_item으로 변경
+                    update_recommendations_query = """
+                        UPDATE mlops.job_recommendations 
+                        SET resume_id = %s 
+                        WHERE resume_id = %s
+                    """
+                    self.db.execute_query(
+                        update_recommendations_query, 
+                        (keep_item['id'], item['id']), 
+                        fetch=False
+                    )
+                    
+                    # user_interactions는 CASCADE 설정이므로 자동 삭제됨
+                    
+                    # 2. 이제 안전하게 cover_letter_samples 레코드 삭제
                     delete_query = "DELETE FROM mlops.cover_letter_samples WHERE id = %s"
                     self.db.execute_query(delete_query, (item['id'],), fetch=False)
                     removed_count += 1
