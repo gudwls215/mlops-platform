@@ -220,9 +220,21 @@ class OpenAIService:
             # 사용량 통계 업데이트
             self.update_usage_stats(response.usage.model_dump())
             
+            # 응답 상세 정보 로깅
+            logger.info(f"OpenAI response - finish_reason: {response.choices[0].finish_reason}")
+            logger.info(f"OpenAI response - model: {response.model}")
+            
+            # content가 None인 경우 처리
+            content = response.choices[0].message.content
+            if content is None:
+                content = ""
+                logger.warning(f"OpenAI returned None content. Response: {response.choices[0]}")
+            else:
+                logger.info(f"OpenAI content length: {len(content)}, first 200 chars: {content[:200]}")
+            
             return {
                 "status": "success",
-                "content": response.choices[0].message.content,
+                "content": content,
                 "model": response.model,
                 "usage": response.usage.model_dump(),
                 "cost": self.calculate_cost(

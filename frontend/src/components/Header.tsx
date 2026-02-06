@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { Description, Work, Create, Recommend, Refresh } from '@mui/icons-material';
+import { Description, Work, Create, Recommend, Refresh, List } from '@mui/icons-material';
 import { useAppContext } from '../contexts/AppContext';
 
 const Header: React.FC = () => {
@@ -56,6 +56,14 @@ const Header: React.FC = () => {
             sx={{ fontSize: '1rem', px: 2 }}
           >
             이력서 작성
+          </Button>
+          <Button
+            color="inherit"
+            startIcon={<List />}
+            onClick={() => navigate('/resume/list')}
+            sx={{ fontSize: '1rem', px: 2 }}
+          >
+            내 이력서
           </Button>
           {/* <Button
             color="inherit"

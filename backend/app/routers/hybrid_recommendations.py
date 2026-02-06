@@ -176,7 +176,7 @@ def get_content_based_recommendations(resume_id: int, top_n: int = 20) -> List[d
     
     # 채용공고 임베딩 조회
     jobs_query = f"""
-    SELECT id, title, company, experience_level, salary_min, salary_max, embedding_array
+    SELECT id, title, company, experience_level, salary_min, salary_max, embedding_array, source_url
     FROM {DB_SCHEMA}.job_postings
     WHERE embedding_array IS NOT NULL
     """
@@ -214,6 +214,7 @@ def get_content_based_recommendations(resume_id: int, top_n: int = 20) -> List[d
             "job_id": int(job_id),
             "title": jobs_df.iloc[idx]['title'],
             "company": jobs_df.iloc[idx]['company'],
+            "url": jobs_df.iloc[idx].get('source_url'),
             "similarity": float(similarity),
             "source": "content-based"
         })
@@ -245,7 +246,7 @@ def get_collaborative_recommendations(resume_id: int, top_n: int = 20) -> List[d
             return []
         
         jobs_query = f"""
-        SELECT id, title, company
+        SELECT id, title, company, source_url
         FROM {DB_SCHEMA}.job_postings
         WHERE id = ANY(:job_ids)
         """
@@ -263,6 +264,7 @@ def get_collaborative_recommendations(resume_id: int, top_n: int = 20) -> List[d
                 "job_id": int(job_id),
                 "title": row['title'],
                 "company": row['company'],
+                "url": row.get('source_url'),
                 "cf_score": float(cf_scores.get(job_id, 0)),
                 "source": "collaborative"
             })
@@ -386,7 +388,9 @@ def hybrid_recommend(
                     top_n=top_n
                 )
         except Exception as e:
-            print(f"다양성/참신성 재정렬 실패 (기본 추천 반환): {e}")
+            import traceback
+            print(f"⚠️ 다양성/참신성 재정렬 실패 (기본 추천 반환): {e}")
+            print(f"상세 오류:\n{traceback.format_exc()}")
     
     return results
 

@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # 데이터베이스 연결 설정
-DB_HOST = os.getenv('POSTGRES_HOST', '114.202.2.226')
-DB_PORT = os.getenv('POSTGRES_PORT', '5433')
-DB_NAME = os.getenv('POSTGRES_DB', 'postgres')
-DB_USER = os.getenv('POSTGRES_USER', 'postgres')
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', '')
+DB_HOST = os.getenv('DATABASE_HOST', '114.202.2.226')
+DB_PORT = os.getenv('DATABASE_PORT', '5433')
+DB_NAME = os.getenv('DATABASE_NAME', 'postgres')
+DB_USER = os.getenv('DATABASE_USER', 'postgres')
+DB_PASSWORD = os.getenv('DATABASE_PASSWORD', '')
 DB_SCHEMA = 'mlops'
 
 import urllib.parse

@@ -57,8 +57,9 @@ services:
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
       OPENAI_API_KEY: "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"
-      OPENAI_MODEL: "gpt-5-nano"
-      OPENAI_MAX_TOKENS: "2000"
+      OPENAI_MODEL: "gpt-4o-mini"
+      OPENAI_MAX_TOKENS: "4000"
+      WHISPER_MODEL: "small"
     volumes:
       - ./backend/app:/app/app
       - ./backend/logs:/app/logs

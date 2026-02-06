@@ -12,6 +12,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import ResumeCreatePage from './pages/ResumeCreatePage';
+import ResumeListPage from './pages/ResumeListPage';
 import CoverLetterPage from './pages/CoverLetterPage';
 import JobListPage from './pages/JobListPage';
 import LabelingPage from './pages/LabelingPage';
@@ -102,6 +103,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/resume/create" element={<ResumeCreatePage />} />
+                <Route path="/resume/list" element={<ResumeListPage />} />
                 <Route path="/cover-letter" element={<CoverLetterPage />} />
                 <Route path="/jobs" element={<JobListPage />} />
                 <Route path="/labeling" element={<LabelingPage />} />

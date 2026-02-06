@@ -15,11 +15,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 데이터베이스 연결 설정
-DB_HOST = os.getenv('POSTGRES_HOST', '114.202.2.226')
-DB_PORT = os.getenv('POSTGRES_PORT', '5433')
-DB_NAME = os.getenv('POSTGRES_DB', 'postgres')
-DB_USER = os.getenv('POSTGRES_USER', 'postgres')
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', '')
+DB_HOST = os.getenv('DATABASE_HOST', '114.202.2.226')
+DB_PORT = os.getenv('DATABASE_PORT', '5433')
+DB_NAME = os.getenv('DATABASE_NAME', 'postgres')
+DB_USER = os.getenv('DATABASE_USER', 'postgres')
+DB_PASSWORD = os.getenv('DATABASE_PASSWORD', '')
 DB_SCHEMA = 'mlops'
 
 import urllib.parse
@@ -142,6 +142,8 @@ class DiversityNoveltyReranker:
         Returns:
             novelty_score가 추가된 추천 리스트
         """
+        print(f"🔍 calculate_novelty_scores 호출: user_id={user_id}, recommendations={len(recommendations)}개")
+        
         if not recommendations:
             return recommendations
         
@@ -164,8 +166,9 @@ class DiversityNoveltyReranker:
                     conn,
                     params={"user_id": user_id, "job_ids": job_ids}
                 )
-        except Exception:
+        except Exception as e:
             # user_interactions 테이블이 없거나 오류 발생 시
+            print(f"⚠️ user_interactions 조회 실패: {e}")
             viewed_df = pd.DataFrame(columns=['job_id', 'last_viewed'])
         
         viewed_dict = dict(zip(viewed_df['job_id'], viewed_df['last_viewed']))
@@ -177,12 +180,16 @@ class DiversityNoveltyReranker:
         WHERE id = ANY(:job_ids)
         """
         
-        with self.engine.connect() as conn:
-            posted_df = pd.read_sql(
-                text(posted_query),
-                conn,
-                params={"job_ids": job_ids}
-            )
+        try:
+            with self.engine.connect() as conn:
+                posted_df = pd.read_sql(
+                    text(posted_query),
+                    conn,
+                    params={"job_ids": job_ids}
+                )
+        except Exception as e:
+            print(f"⚠️ job_postings created_at 조회 실패: {e}")
+            posted_df = pd.DataFrame(columns=['id', 'created_at'])
         
         posted_dict = dict(zip(posted_df['id'], posted_df['created_at']))
         
@@ -237,7 +244,10 @@ class DiversityNoveltyReranker:
             rec['novelty_score'] = novelty_score
             rec['user_novelty'] = user_novelty
             rec['recency_factor'] = recency_factor
+            
+            print(f"  Job {job_id}: novelty={novelty_score:.3f}, user_novelty={user_novelty:.3f}, recency={recency_factor:.3f}")
         
+        print(f"✅ calculate_novelty_scores 완료: {len(recommendations)}개 처리")
         return recommendations
     
     def hybrid_rerank(

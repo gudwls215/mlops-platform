@@ -23,7 +23,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import { OpenInNew, Business, Work } from '@mui/icons-material';
 import axios from 'axios';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
@@ -44,6 +47,7 @@ interface Recommendation {
   novelty_score?: number;
   user_novelty?: number;
   recency_factor?: number;
+  url?: string;
 }
 
 interface RecommendationResponse {
@@ -672,21 +676,34 @@ const HybridRecommendationPage: React.FC = () => {
                   }}
                 >
                   <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                    {/* 상단: 순위 + 회사명(크게) + 업무(오른쪽) */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
                       <Chip
                         label={`#${index + 1}`}
                         color={index < 3 ? 'primary' : 'default'}
-                        size="small"
+                        size="medium"
+                        sx={{ fontWeight: 'bold', fontSize: '1rem' }}
                       />
-                      <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        {rec.title}
-                      </Typography>
-                      <Chip
-                        label={rec.company}
-                        color="secondary"
-                        variant="outlined"
-                        size="small"
-                      />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+                        <Business color="primary" />
+                        <Typography 
+                          variant="h5" 
+                          component="div" 
+                          sx={{ fontWeight: 'bold', color: '#1976d2' }}
+                        >
+                          {rec.company}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Work color="action" />
+                        <Typography 
+                          variant="subtitle1" 
+                          color="text.secondary"
+                          sx={{ fontWeight: 500 }}
+                        >
+                          {rec.title}
+                        </Typography>
+                      </Box>
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
@@ -728,7 +745,17 @@ const HybridRecommendationPage: React.FC = () => {
                       )}
                     </Box>
 
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      {rec.url && (
+                        <Button
+                          variant="outlined"
+                          color="info"
+                          startIcon={<OpenInNew />}
+                          onClick={() => window.open(rec.url, '_blank')}
+                        >
+                          공고 보기
+                        </Button>
+                      )}
                       <Button
                         variant="contained"
                         color="primary"

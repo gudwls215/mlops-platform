@@ -35,6 +35,7 @@ class ResumeService:
             구조화된 이력서 데이터
         """
         logger.info(f"Extracting resume data from {source}")
+        logger.info(f"Input text length: {len(text) if text else 0}, first 500 chars: {text[:500] if text else 'None'}")
         
         # 입력 검증
         if not text or not text.strip():
@@ -82,18 +83,75 @@ class ResumeService:
             {"role": "user", "content": user_prompt}
         ]
         
-        # GPT-4 호출
-        result = self.openai_service.generate_completion(
-            messages=messages,
-            temperature=0.3,  # 낮은 temperature로 일관성 향상
-            max_tokens=2000
-        )
+        # GPT-4 호출 (빈 응답 시 최대 2회 재시도)
+        max_retries = 3
+        last_error = None
+        
+        for attempt in range(max_retries):
+            logger.info(f"OpenAI API 호출 시도 {attempt + 1}/{max_retries}")
+            
+            result = self.openai_service.generate_completion(
+                messages=messages,
+                temperature=0.3,  # 낮은 temperature로 일관성 향상
+                max_tokens=2000
+            )
+            
+            if result["status"] == "success":
+                content = result["content"]
+                
+                # 빈 content 체크 - 재시도
+                if not content or not content.strip():
+                    logger.warning(f"OpenAI returned empty content (attempt {attempt + 1})")
+                    last_error = "AI가 빈 응답을 반환했습니다."
+                    continue  # 재시도
+                
+                # 유효한 응답 받음
+                break
+            else:
+                last_error = result.get("error", "알 수 없는 오류")
+                logger.warning(f"OpenAI API error (attempt {attempt + 1}): {last_error}")
+                continue  # 재시도
+        else:
+            # 모든 재시도 실패
+            logger.error(f"All {max_retries} attempts failed")
+            return {
+                "status": "error",
+                "error": f"{last_error} ({max_retries}회 시도 실패)",
+                "raw_content": ""
+            }
         
         if result["status"] == "success":
             try:
                 import json
+                import re
+                
+                content = result["content"]
+                
+                # 빈 content 체크 (이미 위에서 확인했지만 안전을 위해)
+                if not content or not content.strip():
+                    logger.error("OpenAI returned empty content")
+                    return {
+                        "status": "error",
+                        "error": "AI가 빈 응답을 반환했습니다. 다시 시도해주세요.",
+                        "raw_content": content or ""
+                    }
+                
+                # 코드 블록 제거 (```json ... ``` 또는 ``` ... ```)
+                if "```" in content:
+                    # 코드 블록 내용 추출
+                    pattern = r'```(?:json)?\s*([\s\S]*?)\s*```'
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        content = matches[0]
+                    else:
+                        # 시작 ``` 만 있는 경우
+                        content = re.sub(r'```(?:json)?', '', content)
+                
+                # 앞뒤 공백 제거
+                content = content.strip()
+                
                 # JSON 파싱
-                resume_data = json.loads(result["content"])
+                resume_data = json.loads(content)
                 
                 return {
                     "status": "success",
@@ -106,6 +164,7 @@ class ResumeService:
             
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON: {e}")
+                logger.error(f"Raw content: {result['content'][:500]}")
                 return {
                     "status": "error",
                     "error": "응답을 JSON으로 파싱할 수 없습니다",
@@ -118,12 +177,105 @@ class ResumeService:
                 "error": result.get("error", "알 수 없는 오류")
             }
     
+    def refine_voice_text(
+        self,
+        raw_text: str
+    ) -> Dict[str, Any]:
+        """
+        Whisper STT로 추출된 텍스트를 LLM으로 정제
+        - 음성 인식 오류 수정
+        - 의미가 이상한 부분 교정
+        - 맥락에 맞게 텍스트 정리
+        
+        Args:
+            raw_text: Whisper로 변환된 원본 텍스트
+        
+        Returns:
+            정제된 텍스트와 상태
+        """
+        logger.info(f"Refining voice text, length: {len(raw_text)}")
+        
+        if not raw_text or not raw_text.strip():
+            return {
+                "status": "error",
+                "error": "정제할 텍스트가 비어있습니다.",
+                "refined_text": ""
+            }
+        
+        system_prompt = """당신은 음성 인식 결과를 교정하는 전문가입니다.
+Whisper STT로 변환된 텍스트를 받아 다음을 수행하세요:
+
+1. 음성 인식 오류 수정: 발음이 비슷해서 잘못 인식된 단어를 맥락에 맞게 수정
+2. 띄어쓰기 및 문장 부호 교정
+3. 의미가 불분명하거나 어색한 표현을 자연스럽게 수정
+4. 이력서 관련 용어(회사명, 직위, 기술 등)가 잘못 인식된 경우 올바르게 수정
+
+중요:
+- 원래 화자의 의도를 최대한 유지하세요
+- 내용을 추가하거나 삭제하지 마세요
+- 교정된 텍스트만 출력하세요 (설명 없이)
+- 이력서에 관련된 정보(이름, 연락처, 경력, 학력 등)를 특히 주의해서 교정하세요"""
+
+        user_prompt = f"""다음 음성 인식 텍스트를 교정해주세요:
+
+원본 텍스트:
+{raw_text}
+
+교정된 텍스트:"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # LLM 호출
+        result = self.openai_service.generate_completion(
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        if result["status"] == "success":
+            refined_text = result["content"].strip()
+            
+            if not refined_text:
+                logger.warning("LLM returned empty refined text, using original")
+                return {
+                    "status": "success",
+                    "refined_text": raw_text,
+                    "original_text": raw_text,
+                    "was_refined": False
+                }
+            
+            logger.info(f"Text refined successfully. Original: {len(raw_text)} chars, Refined: {len(refined_text)} chars")
+            logger.info(f"Original first 200 chars: {raw_text[:200]}")
+            logger.info(f"Refined first 200 chars: {refined_text[:200]}")
+            
+            return {
+                "status": "success",
+                "refined_text": refined_text,
+                "original_text": raw_text,
+                "was_refined": True,
+                "tokens_used": result["usage"]["total_tokens"]
+            }
+        else:
+            logger.error(f"Failed to refine text: {result.get('error')}")
+            return {
+                "status": "error",
+                "error": result.get("error", "텍스트 정제 실패"),
+                "refined_text": raw_text,  # 실패 시 원본 반환
+                "original_text": raw_text,
+                "was_refined": False
+            }
+    
     def extract_from_voice_text(
         self,
         voice_text: str
     ) -> Dict[str, Any]:
         """
         음성 변환 텍스트로부터 이력서 데이터 추출
+        1단계: LLM으로 음성 인식 오류 정제
+        2단계: 정제된 텍스트로 이력서 데이터 추출
         
         Args:
             voice_text: Whisper로 변환된 음성 텍스트
@@ -131,7 +283,31 @@ class ResumeService:
         Returns:
             구조화된 이력서 데이터
         """
-        return self.extract_resume_data_from_text(voice_text, source="voice")
+        logger.info("Processing voice text with refinement step")
+        
+        # 1단계: 음성 텍스트 정제
+        refine_result = self.refine_voice_text(voice_text)
+        
+        if refine_result["status"] == "error" and not refine_result.get("refined_text"):
+            return {
+                "status": "error",
+                "error": f"텍스트 정제 실패: {refine_result.get('error')}"
+            }
+        
+        refined_text = refine_result.get("refined_text", voice_text)
+        
+        logger.info(f"Using {'refined' if refine_result.get('was_refined') else 'original'} text for resume extraction")
+        
+        # 2단계: 이력서 데이터 추출
+        extract_result = self.extract_resume_data_from_text(refined_text, source="voice")
+        
+        # 원본 및 정제 정보 추가
+        if extract_result.get("status") == "success":
+            extract_result["original_voice_text"] = voice_text
+            extract_result["refined_voice_text"] = refined_text
+            extract_result["text_was_refined"] = refine_result.get("was_refined", False)
+        
+        return extract_result
     
     def extract_from_user_input(
         self,

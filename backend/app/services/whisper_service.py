@@ -252,7 +252,7 @@ _whisper_service_instance = None
 
 
 def get_whisper_service(
-    model_name: str = "base",
+    model_name: Optional[str] = None,
     device: Optional[str] = None,
     language: str = "ko"
 ) -> WhisperService:
@@ -261,6 +261,7 @@ def get_whisper_service(
     
     Args:
         model_name: 모델 크기 (tiny, base, small, medium, large)
+                   환경변수 WHISPER_MODEL로도 설정 가능 (기본값: small)
         device: 실행 디바이스
         language: 인식 언어
     
@@ -268,6 +269,10 @@ def get_whisper_service(
         WhisperService 인스턴스
     """
     global _whisper_service_instance
+    
+    # 환경변수에서 모델 이름 가져오기 (기본값: small - 더 정확한 인식)
+    if model_name is None:
+        model_name = os.getenv("WHISPER_MODEL", "small")
     
     if _whisper_service_instance is None:
         _whisper_service_instance = WhisperService(

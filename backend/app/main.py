@@ -5,7 +5,7 @@ from pathlib import Path
 from app.routers import (
     resume, job_posting, cover_letter, matching, 
     model_serving, experiments, labeling, recommendations, 
-    hybrid_recommendations
+    hybrid_recommendations, speech
 )
 from app.api import feedback, monitoring
 from app.middleware.usage_monitoring import UsageMonitoringMiddleware
@@ -36,7 +36,7 @@ app.add_middleware(UsageMonitoringMiddleware)
 # 라우터 등록
 app.include_router(resume.router, prefix="/api/v1/resume", tags=["resume"])
 app.include_router(job_posting.router, prefix="/api/v1/job", tags=["job"])
-# app.include_router(speech.router, tags=["speech"])  # whisper 의존성으로 임시 비활성화
+app.include_router(speech.router, tags=["speech"])
 app.include_router(cover_letter.router, tags=["cover-letter"])
 app.include_router(matching.router, tags=["matching"])
 app.include_router(feedback.router, tags=["feedback"])

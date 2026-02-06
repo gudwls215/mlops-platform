@@ -265,7 +265,14 @@ async def extract_from_text(
         result = resume_service.extract_from_user_input(text)
         
         if result["status"] == "error":
-            raise HTTPException(status_code=500, detail=result["error"])
+            # raw_content가 있으면 함께 반환 (디버깅용)
+            error_response = {
+                "status": "error",
+                "error": result["error"]
+            }
+            if "raw_content" in result:
+                error_response["raw_content"] = result["raw_content"]
+            return JSONResponse(status_code=500, content=error_response)
         
         return JSONResponse(content=result)
     
@@ -276,6 +283,49 @@ async def extract_from_text(
         raise HTTPException(
             status_code=500,
             detail=f"텍스트에서 이력서 데이터 추출 실패: {str(e)}"
+        )
+
+
+@router.post("/extract-from-voice-text")
+async def extract_from_voice_text(
+    text: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    음성 인식(STT) 텍스트로부터 이력서 데이터 추출
+    1단계: LLM으로 음성 인식 오류 정제
+    2단계: 정제된 텍스트로 이력서 데이터 추출
+    
+    Args:
+        text: Whisper STT로 변환된 텍스트
+    
+    Returns:
+        구조화된 이력서 데이터 + 원본/정제된 텍스트 정보
+    """
+    try:
+        resume_service = get_resume_service()
+        
+        # 음성 텍스트 전용 처리 (정제 단계 포함)
+        result = resume_service.extract_from_voice_text(text)
+        
+        if result["status"] == "error":
+            error_response = {
+                "status": "error",
+                "error": result["error"]
+            }
+            if "raw_content" in result:
+                error_response["raw_content"] = result["raw_content"]
+            return JSONResponse(status_code=500, content=error_response)
+        
+        return JSONResponse(content=result)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Voice text extraction failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"음성 텍스트에서 이력서 데이터 추출 실패: {str(e)}"
         )
 
 

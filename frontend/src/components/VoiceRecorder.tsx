@@ -16,7 +16,7 @@ import {
 } from '@mui/icons-material';
 
 interface VoiceRecorderProps {
-  onRecordingComplete: (audioBlob: Blob, transcript?: string) => void;
+  onRecordingComplete: (audioBlob: Blob, transcript?: string) => void | Promise<void>;
   maxDuration?: number; // 초 단위
   autoTranscribe?: boolean;
 }
@@ -178,27 +178,23 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   };
 
   const handleComplete = async () => {
-    if (!audioBlob) return;
+    if (!audioBlob) {
+      setError('녹음된 음성이 없습니다. 먼저 녹음을 해주세요.');
+      return;
+    }
 
-    if (autoTranscribe) {
-      setIsTranscribing(true);
-      try {
-        // 여기서 실제 STT API 호출
-        // const formData = new FormData();
-        // formData.append('file', audioBlob);
-        // const response = await axios.post('/api/speech/transcribe', formData);
-        // onRecordingComplete(audioBlob, response.data.text);
-        
-        // 임시로 바로 전달
-        onRecordingComplete(audioBlob);
-      } catch (err) {
-        console.error('음성 변환 오류:', err);
-        setError('음성을 텍스트로 변환하는 중 오류가 발생했습니다.');
-      } finally {
-        setIsTranscribing(false);
-      }
-    } else {
-      onRecordingComplete(audioBlob);
+    setIsTranscribing(true);
+    setError(null);
+    
+    try {
+      // 부모 컴포넌트(ResumeCreatePage)에서 실제 STT API 호출 및 이력서 생성 처리
+      // VoiceRecorder는 audioBlob만 전달하고, STT 처리는 부모에서 수행
+      await onRecordingComplete(audioBlob);
+    } catch (err: any) {
+      console.error('이력서 생성 오류:', err);
+      setError(err.message || '이력서 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
