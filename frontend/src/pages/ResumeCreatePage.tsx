@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -15,6 +15,8 @@ import {
   Chip
 } from '@mui/material';
 import { Mic, Create, Save, CheckCircle, Feedback, ArrowForward, Edit, Add, Delete } from '@mui/icons-material';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import VoiceRecorder from '../components/VoiceRecorder';
 import FeedbackModal from '../components/FeedbackModal';
 import FlowStepIndicator from '../components/FlowStepIndicator';
@@ -76,6 +78,7 @@ const ResumeCreatePage: React.FC = () => {
   const [newSkill, setNewSkill] = useState('');
   const [isEditMode, setIsEditMode] = useState(false); // 기존 이력서 수정 모드
   const [editingResumeId, setEditingResumeId] = useState<number | null>(null);
+  const resumeContentRef = useRef<HTMLDivElement>(null);
 
   // URL 파라미터로 edit 모드인 경우 이력서 불러오기
   useEffect(() => {
@@ -393,6 +396,70 @@ const ResumeCreatePage: React.FC = () => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!resumeContentRef.current || !generatedResume) {
+      setError('다운로드할 이력서가 없습니다.');
+      return;
+    }
+
+    try {
+      setSuccessMessage('PDF를 생성 중입니다...');
+      
+      // 이력서 내용의 복사본 생성 (스타일 조정을 위해)
+      const element = resumeContentRef.current;
+      
+      // html2canvas로 HTML을 캔버스로 변환
+      const canvas = await html2canvas(element, {
+        scale: 2, // 고해상도
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      // 캔버스를 이미지로 변환
+      const imgData = canvas.toDataURL('image/png');
+      
+      // PDF 생성 (A4 사이즈)
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 0;
+      
+      // 이미지가 한 페이지보다 길 경우 여러 페이지로 분할
+      const pageHeight = imgHeight * ratio;
+      let heightLeft = pageHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      heightLeft -= pdfHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, imgHeight * ratio);
+        heightLeft -= pdfHeight;
+      }
+      
+      // PDF 다운로드
+      const fileName = `${generatedResume?.기본정보?.이름 || '이력서'}_이력서_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      setSuccessMessage('PDF 다운로드가 완료되었습니다!');
+    } catch (err: any) {
+      console.error('PDF 생성 오류:', err);
+      setError('PDF 생성 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <Container maxWidth="md">
       <FlowStepIndicator currentStep={currentStep} />
@@ -464,7 +531,9 @@ const ResumeCreatePage: React.FC = () => {
           )}
 
           {/* 이력서 내용 */}
-          <Box sx={{
+          <Box 
+            ref={resumeContentRef}
+            sx={{
             mt: 3,
             bgcolor: 'white',
             p: 4,
@@ -817,9 +886,10 @@ const ResumeCreatePage: React.FC = () => {
                   variant="outlined"
                   color="primary"
                   size="large"
+                  onClick={handleDownloadPDF}
                   sx={{ fontSize: '1.1rem', py: 1.5, px: 4 }}
                 >
-                  이력서 다운로드
+                  이력서 PDF 다운로드
                 </Button>
                 <Button
                   variant="contained"

@@ -1,0 +1,37 @@
+[Unit]
+Description=Frontend Production (serve SPA on port 9001)
+After=network.target
+
+[Service]
+Type=simple
+User=ttm
+Group=ttm
+WorkingDirectory=/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/frontend
+
+# 시작 전 정적 파일 동기화 (favicon 등)
+ExecStartPre=/bin/bash -c '\
+  BUILD="/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/frontend/build"; \
+  PUB="/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/frontend/public"; \
+  if [ -d "$BUILD" ]; then \
+    for f in favicon.ico logo192.png logo512.png manifest.json robots.txt; do \
+      if [ -f "$PUB/$f" ] && ! cmp -s "$PUB/$f" "$BUILD/$f" 2>/dev/null; then \
+        cp "$PUB/$f" "$BUILD/$f"; echo "Synced $f"; \
+      fi; \
+    done; \
+  fi'
+
+ExecStart=/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/frontend/node_modules/.bin/serve -s /home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/frontend/build -l 9001 --no-clipboard
+
+Environment="PATH=/usr/bin:/usr/local/bin:/home/ttm/.local/bin"
+Environment="NODE_ENV=production"
+
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+StandardOutput=append:/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/logs/frontend-prod.log
+StandardError=append:/home/ttm/tensorflow-jupyter/jupyterNotebook/khj/mlops-platform/logs/frontend-prod.log
+
+[Install]
+WantedBy=multi-user.target
